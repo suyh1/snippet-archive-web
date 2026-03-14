@@ -1,0 +1,432 @@
+openapi: 3.0.3
+info:
+  title: Snippet Archive Workspace API
+  version: 1.0.0
+  description: Workspace and WorkspaceFile v1 endpoints.
+servers:
+  - url: http://localhost:3001
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                required: [status]
+  /api/workspaces:
+    get:
+      summary: List workspaces
+      responses:
+        '200':
+          description: Workspace list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceListResponse'
+    post:
+      summary: Create workspace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkspaceInput'
+      responses:
+        '201':
+          description: Created workspace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+  /api/workspaces/{workspaceId}:
+    get:
+      summary: Get workspace detail
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: Workspace detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    patch:
+      summary: Update workspace
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWorkspaceInput'
+      responses:
+        '200':
+          description: Updated workspace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    delete:
+      summary: Delete workspace
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: Deleted workspace id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteIdResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+  /api/workspaces/{workspaceId}/files:
+    get:
+      summary: List workspace files
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: Workspace file list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceFileListResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    post:
+      summary: Create workspace file or folder
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkspaceFileInput'
+      responses:
+        '201':
+          description: Created file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceFileResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+  /api/workspaces/{workspaceId}/files/{fileId}:
+    get:
+      summary: Get workspace file detail
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/FileId'
+      responses:
+        '200':
+          description: Workspace file detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceFileResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    patch:
+      summary: Update workspace file
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/FileId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWorkspaceFileInput'
+      responses:
+        '200':
+          description: Updated workspace file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceFileResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+    delete:
+      summary: Delete workspace file
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/FileId'
+      responses:
+        '200':
+          description: Deleted file id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteIdResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+  /api/workspaces/{workspaceId}/files/{fileId}/move:
+    patch:
+      summary: Move workspace file/folder to target path
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/FileId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoveWorkspaceFileInput'
+      responses:
+        '200':
+          description: Moved workspace file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceFileResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+components:
+  parameters:
+    WorkspaceId:
+      name: workspaceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    FileId:
+      name: fileId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorResponse'
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorResponse'
+    ConflictError:
+      description: Resource conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorResponse'
+  schemas:
+    Workspace:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        starred:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        lastOpenedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required: [id, title, description, tags, starred]
+    WorkspaceFile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        workspaceId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        path:
+          type: string
+        language:
+          type: string
+        content:
+          type: string
+        kind:
+          type: string
+          enum: [file, folder]
+        order:
+          type: integer
+      required: [id, workspaceId, name, path, language, content, kind, order]
+    CreateWorkspaceInput:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        starred:
+          type: boolean
+      required: [title]
+    UpdateWorkspaceInput:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        starred:
+          type: boolean
+    CreateWorkspaceFileInput:
+      type: object
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        language:
+          type: string
+        content:
+          type: string
+        kind:
+          type: string
+          enum: [file, folder]
+        order:
+          type: integer
+      required: [name, path, language, kind, order]
+    UpdateWorkspaceFileInput:
+      type: object
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        language:
+          type: string
+        content:
+          type: string
+        kind:
+          type: string
+          enum: [file, folder]
+        order:
+          type: integer
+    MoveWorkspaceFileInput:
+      type: object
+      properties:
+        targetPath:
+          type: string
+        targetOrder:
+          type: integer
+          minimum: 1
+      required: [targetPath]
+    ApiError:
+      type: object
+      properties:
+        code:
+          type: string
+          enum: [VALIDATION_ERROR, NOT_FOUND, CONFLICT, INTERNAL_ERROR]
+        message:
+          type: string
+        details:
+          nullable: true
+      required: [code, message]
+    ApiErrorResponse:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/ApiError'
+      required: [error]
+    WorkspaceResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Workspace'
+      required: [data]
+    WorkspaceListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Workspace'
+          required: [items]
+      required: [data]
+    WorkspaceFileResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/WorkspaceFile'
+      required: [data]
+    WorkspaceFileListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/WorkspaceFile'
+          required: [items]
+      required: [data]
+    DeleteIdResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+          required: [id]
+      required: [data]

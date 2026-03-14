@@ -39,20 +39,23 @@
 - 前端已完成 Library / Workspace 双态
 - 前端已完成文件树展示、新建文件/文件夹、拖拽移动主链路
 - 前端已引入 Vitest，并覆盖 path/store 关键单测（7 个用例）
+- 后端已补充 WorkspaceService 单元测试（5 个用例）
+- 前端已补充关键组件测试：`WorkspaceSidebar`、`FileTree`（5 个用例）
+- OpenAPI 文档已补充：`docs/openapi/workspace-v1.yaml`
 - PostgreSQL 容器已启动并可用
 - Prisma Client 已生成，`db push` 已通过
 
 ## 3. 下一线程优先任务（按顺序）
 
-### Task E: 质量与交付基线（下一优先）
-1. 后端: 在现有 e2e 基础上补齐 service 单元测试（尤其 path/order 归一化分支）
-2. 前端: 补齐关键组件测试（`FileTree` 拖拽行为与 `WorkspaceSidebar` 交互）
-3. 补充 OpenAPI 文档（覆盖 workspace + file move 接口）
-
-### Task F: 编辑器与交互增强
+### Task F: 编辑器与交互增强（下一优先）
 1. 接入编辑器内容保存（文件打开/编辑/保存）
 2. 增加重命名/删除文件（含文件夹级联删除）交互入口
 3. 优化拖拽反馈（目标高亮、非法目标提示）
+
+### Task G: 交付完善
+1. 基于 `docs/openapi/workspace-v1.yaml` 接入 Swagger UI 或生成 SDK
+2. 增加前端端到端冒烟测试（关键路径：新建 workspace -> 新建文件 -> 拖拽移动）
+3. 梳理错误提示文案与空状态体验
 
 ## 4. 启动命令（下次可直接复制）
 

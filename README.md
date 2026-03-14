@@ -83,6 +83,10 @@ npm run test:run --workspace @snippet-archive/frontend
 npm run typecheck --workspace @snippet-archive/frontend
 ```
 
+### 7. OpenAPI 文档
+
+- `docs/openapi/workspace-v1.yaml`
+
 ## 下一步开发说明
 
 下一次开启 Codex 线程时，请优先读取:
