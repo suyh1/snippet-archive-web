@@ -11,6 +11,8 @@ vi.mock('@/api/workspaces', () => {
       listFiles: vi.fn(),
       createFile: vi.fn(),
       moveFile: vi.fn(),
+      updateFile: vi.fn(),
+      deleteFile: vi.fn(),
     },
   }
 })
@@ -78,5 +80,106 @@ describe('workspace store', () => {
 
     expect(store.workspaces).toHaveLength(0)
     expect(store.currentWorkspaceId).toBe(null)
+  })
+
+  it('saves current file content through updateFile api', async () => {
+    const store = useWorkspaceStore()
+    store.currentWorkspaceId = 'w1'
+    store.files = [
+      {
+        id: 'f1',
+        workspaceId: 'w1',
+        name: 'main.ts',
+        path: '/main.ts',
+        language: 'typescript',
+        content: 'console.log(1)',
+        kind: 'file',
+        order: 1,
+      },
+    ]
+    store.activeFileId = 'f1'
+    store.draftContent = 'console.log(2)'
+    store.dirty = true
+
+    vi.mocked(workspaceApi.updateFile).mockResolvedValue({
+      ...store.files[0],
+      content: 'console.log(2)',
+    })
+    vi.mocked(workspaceApi.listFiles).mockResolvedValue([
+      {
+        ...store.files[0],
+        content: 'console.log(2)',
+      },
+    ])
+
+    await store.saveCurrentFile()
+
+    expect(workspaceApi.updateFile).toHaveBeenCalledWith('w1', 'f1', {
+      content: 'console.log(2)',
+    })
+    expect(store.dirty).toBe(false)
+  })
+
+  it('renames file by move api', async () => {
+    const store = useWorkspaceStore()
+    store.currentWorkspaceId = 'w1'
+    store.files = [
+      {
+        id: 'f1',
+        workspaceId: 'w1',
+        name: 'main.ts',
+        path: '/src/main.ts',
+        language: 'typescript',
+        content: '',
+        kind: 'file',
+        order: 1,
+      },
+    ]
+
+    vi.mocked(workspaceApi.moveFile).mockResolvedValue({
+      ...store.files[0],
+      name: 'entry.ts',
+      path: '/src/entry.ts',
+    })
+    vi.mocked(workspaceApi.listFiles).mockResolvedValue([
+      {
+        ...store.files[0],
+        name: 'entry.ts',
+        path: '/src/entry.ts',
+      },
+    ])
+
+    await store.renameFile('f1', 'entry.ts')
+
+    expect(workspaceApi.moveFile).toHaveBeenCalledWith('w1', 'f1', {
+      targetPath: '/src/entry.ts',
+      targetOrder: 1,
+    })
+  })
+
+  it('deletes selected file and clears active selection', async () => {
+    const store = useWorkspaceStore()
+    store.currentWorkspaceId = 'w1'
+    store.files = [
+      {
+        id: 'f1',
+        workspaceId: 'w1',
+        name: 'main.ts',
+        path: '/main.ts',
+        language: 'typescript',
+        content: '',
+        kind: 'file',
+        order: 1,
+      },
+    ]
+    store.activeFileId = 'f1'
+
+    vi.mocked(workspaceApi.deleteFile).mockResolvedValue({ id: 'f1' })
+    vi.mocked(workspaceApi.listFiles).mockResolvedValue([])
+
+    await store.deleteFile('f1')
+
+    expect(workspaceApi.deleteFile).toHaveBeenCalledWith('w1', 'f1')
+    expect(store.activeFileId).toBe(null)
   })
 })

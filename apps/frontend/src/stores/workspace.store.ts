@@ -5,7 +5,7 @@ import type {
   Workspace,
   WorkspaceFile,
 } from '@/types/workspace'
-import { basename, joinPath, normalizePath } from '@/utils/path'
+import { basename, getParentPath, joinPath, normalizePath } from '@/utils/path'
 
 function inferLanguage(name: string) {
   if (name.endsWith('.ts')) {
@@ -24,6 +24,10 @@ function inferLanguage(name: string) {
     return 'json'
   }
 
+  if (name.endsWith('.md')) {
+    return 'markdown'
+  }
+
   return 'plaintext'
 }
 
@@ -32,6 +36,9 @@ export const useWorkspaceStore = defineStore('workspace', {
     workspaces: [] as Workspace[],
     files: [] as WorkspaceFile[],
     currentWorkspaceId: null as string | null,
+    activeFileId: null as string | null,
+    draftContent: '',
+    dirty: false,
     loading: false,
     loadingFiles: false,
     saving: false,
@@ -41,6 +48,9 @@ export const useWorkspaceStore = defineStore('workspace', {
     currentWorkspace(state) {
       return state.workspaces.find((item) => item.id === state.currentWorkspaceId) ?? null
     },
+    activeFile(state) {
+      return state.files.find((item) => item.id === state.activeFileId) ?? null
+    },
     libraryMode(state) {
       return state.currentWorkspaceId === null
     },
@@ -48,6 +58,28 @@ export const useWorkspaceStore = defineStore('workspace', {
   actions: {
     clearError() {
       this.errorMessage = null
+    },
+
+    resetEditor() {
+      this.activeFileId = null
+      this.draftContent = ''
+      this.dirty = false
+    },
+
+    syncEditorWithFiles() {
+      if (!this.activeFileId) {
+        return
+      }
+
+      const selected = this.files.find((item) => item.id === this.activeFileId)
+      if (!selected || selected.kind !== 'file') {
+        this.resetEditor()
+        return
+      }
+
+      if (!this.dirty) {
+        this.draftContent = selected.content ?? ''
+      }
     },
 
     async loadWorkspaces() {
@@ -79,6 +111,7 @@ export const useWorkspaceStore = defineStore('workspace', {
         }
 
         this.currentWorkspaceId = workspaceId
+        this.resetEditor()
         this.files = await workspaceApi.listFiles(workspaceId)
       } catch (error) {
         this.errorMessage =
@@ -101,6 +134,7 @@ export const useWorkspaceStore = defineStore('workspace', {
         const created = await workspaceApi.create({ title: trimmedTitle })
         this.workspaces = [created, ...this.workspaces]
         this.currentWorkspaceId = created.id
+        this.resetEditor()
         this.files = await workspaceApi.listFiles(created.id)
       } catch (error) {
         this.errorMessage =
@@ -126,6 +160,7 @@ export const useWorkspaceStore = defineStore('workspace', {
           } else {
             this.files = []
           }
+          this.resetEditor()
         }
       } catch (error) {
         this.errorMessage =
@@ -138,6 +173,7 @@ export const useWorkspaceStore = defineStore('workspace', {
     async loadWorkspaceFiles() {
       if (!this.currentWorkspaceId) {
         this.files = []
+        this.resetEditor()
         return
       }
 
@@ -146,11 +182,61 @@ export const useWorkspaceStore = defineStore('workspace', {
 
       try {
         this.files = await workspaceApi.listFiles(this.currentWorkspaceId)
+        this.syncEditorWithFiles()
       } catch (error) {
         this.errorMessage =
           error instanceof Error ? error.message : 'Failed to load files'
       } finally {
         this.loadingFiles = false
+      }
+    },
+
+    selectFile(fileId: string) {
+      const file = this.files.find((item) => item.id === fileId)
+      if (!file || file.kind !== 'file') {
+        return
+      }
+
+      this.activeFileId = file.id
+      this.draftContent = file.content ?? ''
+      this.dirty = false
+    },
+
+    setDraftContent(content: string) {
+      this.draftContent = content
+
+      const active = this.files.find((item) => item.id === this.activeFileId)
+      if (!active || active.kind !== 'file') {
+        this.dirty = false
+        return
+      }
+
+      this.dirty = content !== (active.content ?? '')
+    },
+
+    async saveCurrentFile() {
+      const workspaceId = this.currentWorkspaceId
+      const fileId = this.activeFileId
+
+      if (!workspaceId || !fileId || !this.dirty) {
+        return
+      }
+
+      this.saving = true
+      this.errorMessage = null
+
+      try {
+        await workspaceApi.updateFile(workspaceId, fileId, {
+          content: this.draftContent,
+        })
+
+        await this.loadWorkspaceFiles()
+        this.dirty = false
+      } catch (error) {
+        this.errorMessage =
+          error instanceof Error ? error.message : 'Failed to save file'
+      } finally {
+        this.saving = false
       }
     },
 
@@ -214,6 +300,70 @@ export const useWorkspaceStore = defineStore('workspace', {
       })
 
       await this.loadWorkspaceFiles()
+    },
+
+    async renameFile(fileId: string, newName: string) {
+      const workspaceId = this.currentWorkspaceId
+      if (!workspaceId) {
+        return
+      }
+
+      const trimmed = newName.trim()
+      if (!trimmed) {
+        return
+      }
+
+      const file = this.files.find((item) => item.id === fileId)
+      if (!file) {
+        return
+      }
+
+      const targetPath = normalizePath(joinPath(getParentPath(file.path), trimmed))
+
+      await workspaceApi.moveFile(workspaceId, fileId, {
+        targetPath,
+        targetOrder: file.order,
+      })
+
+      await this.loadWorkspaceFiles()
+    },
+
+    async deleteFile(fileId: string) {
+      const workspaceId = this.currentWorkspaceId
+      if (!workspaceId) {
+        return
+      }
+
+      const target = this.files.find((item) => item.id === fileId)
+      await workspaceApi.deleteFile(workspaceId, fileId)
+      await this.loadWorkspaceFiles()
+
+      if (!target) {
+        return
+      }
+
+      if (this.activeFileId === fileId) {
+        this.resetEditor()
+        return
+      }
+
+      const active = this.files.find((item) => item.id === this.activeFileId)
+      if (!active) {
+        this.resetEditor()
+        return
+      }
+
+      if (target.kind === 'folder') {
+        const normalizedTargetPath = normalizePath(target.path)
+        const normalizedActivePath = normalizePath(active.path)
+
+        if (
+          normalizedActivePath === normalizedTargetPath ||
+          normalizedActivePath.startsWith(`${normalizedTargetPath}/`)
+        ) {
+          this.resetEditor()
+        }
+      }
     },
   },
 })

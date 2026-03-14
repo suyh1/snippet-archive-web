@@ -42,6 +42,16 @@ export const workspaceApi = {
       body: JSON.stringify(payload),
     })
   },
+  updateFile(
+    workspaceId: string,
+    fileId: string,
+    payload: Partial<Pick<WorkspaceFile, 'name' | 'path' | 'language' | 'content' | 'kind' | 'order'>>,
+  ) {
+    return apiRequest<WorkspaceFile>(`/workspaces/${workspaceId}/files/${fileId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    })
+  },
   moveFile(
     workspaceId: string,
     fileId: string,

@@ -30,6 +30,7 @@
 - 已实现 `PATCH /api/workspaces/:workspaceId/files/:fileId/move`（支持文件夹递归移动）。
 - 已接入 `class-validator` + 全局异常过滤器，统一校验与错误响应。
 - 前端已接入真实后端，完成 Library / Workspace 双态与文件树拖拽移动主链路。
+- 前端已接入文件编辑保存、重命名/删除入口与拖拽反馈增强。
 
 ## 快速开始
 

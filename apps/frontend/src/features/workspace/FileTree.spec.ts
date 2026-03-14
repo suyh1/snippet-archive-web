@@ -65,4 +65,66 @@ describe('FileTree', () => {
 
     expect(wrapper.emitted('moveFile')).toBeUndefined()
   })
+
+  it('emits select-file, rename-file and delete-file actions', async () => {
+    const wrapper = mount(FileTree, {
+      props: {
+        files: [
+          {
+            id: 'file-1',
+            workspaceId: 'w1',
+            name: 'a.ts',
+            path: '/a.ts',
+            language: 'typescript',
+            content: '',
+            kind: 'file',
+            order: 1,
+          },
+        ],
+      },
+    })
+
+    await wrapper.find('.row-main').trigger('click')
+    await wrapper.find('[data-testid="rename-item"]').trigger('click')
+    await wrapper.find('[data-testid="delete-item"]').trigger('click')
+
+    expect(wrapper.emitted('select-file')).toEqual([['file-1']])
+    expect(wrapper.emitted('rename-file')).toEqual([['file-1']])
+    expect(wrapper.emitted('delete-file')).toEqual([['file-1']])
+  })
+
+  it('shows invalid drop feedback message for folder descendant target', async () => {
+    const wrapper = mount(FileTree, {
+      props: {
+        files: [
+          {
+            id: 'folder-root',
+            workspaceId: 'w1',
+            name: 'src',
+            path: '/src',
+            language: 'plaintext',
+            content: '',
+            kind: 'folder',
+            order: 1,
+          },
+          {
+            id: 'folder-child',
+            workspaceId: 'w1',
+            name: 'child',
+            path: '/src/child',
+            language: 'plaintext',
+            content: '',
+            kind: 'folder',
+            order: 1,
+          },
+        ],
+      },
+    })
+
+    const rows = wrapper.findAll('.row')
+    await rows[0].trigger('dragstart')
+    await rows[1].trigger('drop')
+
+    expect(wrapper.text()).toContain('不能移动到自身子目录')
+  })
 })

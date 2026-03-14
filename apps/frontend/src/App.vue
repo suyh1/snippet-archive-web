@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import FileTree from '@/features/workspace/FileTree.vue'
 import WorkspaceSidebar from '@/features/workspace/WorkspaceSidebar.vue'
@@ -12,12 +12,19 @@ const {
   currentWorkspaceId,
   currentWorkspace,
   files,
+  activeFile,
   loading,
   loadingFiles,
   saving,
   libraryMode,
   errorMessage,
+  draftContent,
+  dirty,
 } = storeToRefs(workspaceStore)
+
+const canSave = computed(() => {
+  return !!activeFile.value && activeFile.value.kind === 'file' && dirty.value && !saving.value
+})
 
 onMounted(async () => {
   await workspaceStore.loadWorkspaces()
@@ -45,6 +52,7 @@ function deleteWorkspace(workspaceId: string) {
 function backToLibrary() {
   workspaceStore.currentWorkspaceId = null
   workspaceStore.files = []
+  workspaceStore.resetEditor()
 }
 
 function createFile(parentPath: string) {
@@ -69,6 +77,44 @@ function createFolder(parentPath: string) {
 
 function moveFile(payload: { fileId: string; targetParentPath: string }) {
   void workspaceStore.moveFileToParent(payload.fileId, payload.targetParentPath)
+}
+
+function selectFile(fileId: string) {
+  workspaceStore.selectFile(fileId)
+}
+
+function renameFile(fileId: string) {
+  const target = files.value.find((item) => item.id === fileId)
+  if (!target) {
+    return
+  }
+
+  const nextName = window.prompt('输入新名称', target.name)?.trim()
+  if (!nextName || nextName === target.name) {
+    return
+  }
+
+  void workspaceStore.renameFile(fileId, nextName)
+}
+
+function deleteFile(fileId: string) {
+  const target = files.value.find((item) => item.id === fileId)
+  const confirmed = window.confirm(`确认删除「${target?.name ?? fileId}」？`)
+
+  if (!confirmed) {
+    return
+  }
+
+  void workspaceStore.deleteFile(fileId)
+}
+
+function onDraftInput(event: Event) {
+  const value = (event.target as HTMLTextAreaElement).value
+  workspaceStore.setDraftContent(value)
+}
+
+function saveFile() {
+  void workspaceStore.saveCurrentFile()
 }
 </script>
 
@@ -138,18 +184,47 @@ function moveFile(payload: { fileId: string; targetParentPath: string }) {
         <article class="summary-card">
           <h3>{{ currentWorkspace?.title }}</h3>
           <p>
-            拖拽文件或文件夹到目标文件夹（或根目录）即可触发移动。
-            目录顺序与路径由后端统一校正。
+            支持文件编辑保存、重命名与删除。拖拽文件/文件夹时会提示合法与非法目标。
           </p>
         </article>
 
-        <FileTree
-          :files="files"
-          :loading="loadingFiles"
-          @create-file="createFile"
-          @create-folder="createFolder"
-          @move-file="moveFile"
-        />
+        <div class="workspace-main">
+          <FileTree
+            :files="files"
+            :loading="loadingFiles"
+            :active-file-id="activeFile?.id ?? null"
+            @create-file="createFile"
+            @create-folder="createFolder"
+            @move-file="moveFile"
+            @select-file="selectFile"
+            @rename-file="renameFile"
+            @delete-file="deleteFile"
+          />
+
+          <section class="editor-panel">
+            <header class="editor-head">
+              <h3>{{ activeFile?.name ?? 'Editor' }}</h3>
+              <button
+                type="button"
+                :disabled="!canSave"
+                @click="saveFile"
+              >
+                {{ saving ? '保存中...' : dirty ? '保存' : '已保存' }}
+              </button>
+            </header>
+
+            <textarea
+              v-if="activeFile"
+              class="editor-textarea"
+              :value="draftContent"
+              @input="onDraftInput"
+            />
+
+            <p v-else class="editor-empty">
+              请选择一个文件开始编辑。
+            </p>
+          </section>
+        </div>
       </section>
     </section>
   </main>
@@ -262,6 +337,78 @@ h2 {
 .empty-note {
   margin: 0;
   color: #64748b;
+}
+
+.workspace-main {
+  display: grid;
+  grid-template-columns: minmax(360px, 1fr) minmax(320px, 1fr);
+  gap: 14px;
+}
+
+.editor-panel {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 16px;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 420px;
+}
+
+.editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+.editor-head h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.editor-head button {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.editor-head button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.editor-textarea {
+  width: 100%;
+  height: 100%;
+  border: none;
+  padding: 12px;
+  resize: none;
+  outline: none;
+  font-family: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 0 0 16px 16px;
+}
+
+.editor-empty {
+  margin: 0;
+  display: grid;
+  place-items: center;
+  color: #64748b;
+}
+
+@media (max-width: 1200px) {
+  .workspace-main {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 960px) {

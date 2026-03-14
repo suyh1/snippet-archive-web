@@ -15,15 +15,22 @@ type TreeRow = {
 const props = defineProps<{
   files: WorkspaceFile[]
   loading?: boolean
+  activeFileId?: string | null
 }>()
 
 const emit = defineEmits<{
   createFile: [parentPath: string]
   createFolder: [parentPath: string]
   moveFile: [payload: { fileId: string; targetParentPath: string }]
+  'select-file': [fileId: string]
+  'rename-file': [fileId: string]
+  'delete-file': [fileId: string]
 }>()
 
 const draggingId = ref<string | null>(null)
+const hoverTargetPath = ref<string | null>(null)
+const invalidTargetPath = ref<string | null>(null)
+const dropMessage = ref('')
 
 const rows = computed<TreeRow[]>(() => {
   const sorted = [...props.files].sort((a, b) => {
@@ -61,13 +68,29 @@ function createFolderAt(parentPath: string) {
 
 function dragStart(fileId: string) {
   draggingId.value = fileId
+  hoverTargetPath.value = null
+  invalidTargetPath.value = null
+  dropMessage.value = ''
 }
 
 function dragEnd() {
   draggingId.value = null
+  hoverTargetPath.value = null
+  invalidTargetPath.value = null
 }
 
-function dropToParent(targetParentPath: string) {
+function isInvalidDropTarget(draggingPath: string, draggingKind: string, targetParentPath: string) {
+  if (draggingKind !== 'folder') {
+    return false
+  }
+
+  return (
+    targetParentPath === draggingPath ||
+    targetParentPath.startsWith(`${draggingPath}/`)
+  )
+}
+
+function handleDropTarget(targetParentPath: string) {
   if (!draggingId.value) {
     return
   }
@@ -81,12 +104,9 @@ function dropToParent(targetParentPath: string) {
   const normalizedTargetParent = normalizePath(targetParentPath)
   const normalizedDraggingPath = normalizePath(draggingRow.path)
 
-  // folder cannot be moved under itself or its descendants
-  if (
-    draggingRow.kind === 'folder' &&
-    (normalizedTargetParent === normalizedDraggingPath ||
-      normalizedTargetParent.startsWith(`${normalizedDraggingPath}/`))
-  ) {
+  if (isInvalidDropTarget(normalizedDraggingPath, draggingRow.kind, normalizedTargetParent)) {
+    invalidTargetPath.value = normalizedTargetParent
+    dropMessage.value = '不能移动到自身子目录'
     draggingId.value = null
     return
   }
@@ -96,16 +116,65 @@ function dropToParent(targetParentPath: string) {
     targetParentPath: normalizedTargetParent,
   })
 
+  dropMessage.value = ''
+  invalidTargetPath.value = null
+  hoverTargetPath.value = null
   draggingId.value = null
+}
+
+function handleDragOverTarget(targetParentPath: string) {
+  if (!draggingId.value) {
+    return
+  }
+
+  const draggingRow = rows.value.find((row) => row.id === draggingId.value)
+  if (!draggingRow) {
+    return
+  }
+
+  const normalizedTargetParent = normalizePath(targetParentPath)
+  const normalizedDraggingPath = normalizePath(draggingRow.path)
+
+  if (isInvalidDropTarget(normalizedDraggingPath, draggingRow.kind, normalizedTargetParent)) {
+    invalidTargetPath.value = normalizedTargetParent
+    hoverTargetPath.value = null
+    dropMessage.value = '不能移动到自身子目录'
+    return
+  }
+
+  invalidTargetPath.value = null
+  hoverTargetPath.value = normalizedTargetParent
+  dropMessage.value = ''
 }
 
 function dropOnRow(row: TreeRow) {
   if (row.kind === 'folder') {
-    dropToParent(row.path)
+    handleDropTarget(row.path)
     return
   }
 
-  dropToParent(getParentPath(row.path))
+  handleDropTarget(getParentPath(row.path))
+}
+
+function dragOverRow(row: TreeRow) {
+  if (row.kind === 'folder') {
+    handleDragOverTarget(row.path)
+    return
+  }
+
+  handleDragOverTarget(getParentPath(row.path))
+}
+
+function selectFile(fileId: string) {
+  emit('select-file', fileId)
+}
+
+function renameFile(fileId: string) {
+  emit('rename-file', fileId)
+}
+
+function deleteFile(fileId: string) {
+  emit('delete-file', fileId)
 }
 </script>
 
@@ -124,12 +193,16 @@ function dropOnRow(row: TreeRow) {
     </header>
 
     <div
-      class="root-dropzone"
-      @dragover.prevent
-      @drop.prevent="dropToParent('/')"
+      :class="['root-dropzone', { active: hoverTargetPath === '/', invalid: invalidTargetPath === '/' }]"
+      @dragover.prevent="handleDragOverTarget('/')"
+      @drop.prevent="handleDropTarget('/')"
     >
       拖拽到这里可移动到根目录
     </div>
+
+    <p v-if="dropMessage" class="drop-message">
+      {{ dropMessage }}
+    </p>
 
     <p v-if="loading" class="hint">文件加载中...</p>
 
@@ -137,28 +210,57 @@ function dropOnRow(row: TreeRow) {
       <li
         v-for="row in rows"
         :key="row.id"
-        class="row"
+        :class="[
+          'row',
+          { active: row.id === props.activeFileId },
+          { 'drop-active': hoverTargetPath === (row.kind === 'folder' ? row.path : getParentPath(row.path)) },
+          { 'drop-invalid': invalidTargetPath === (row.kind === 'folder' ? row.path : getParentPath(row.path)) },
+        ]"
         :draggable="true"
         @dragstart="dragStart(row.id)"
         @dragend="dragEnd"
-        @dragover.prevent
+        @dragover.prevent="dragOverRow(row)"
         @drop.prevent="dropOnRow(row)"
       >
-        <div
+        <button
+          type="button"
           class="row-main"
           :style="{ paddingLeft: `${row.depth * 16 + 8}px` }"
+          @click="selectFile(row.id)"
         >
           <span class="kind">{{ row.kind === 'folder' ? '📁' : '📄' }}</span>
           <span class="name">{{ row.name }}</span>
           <span class="meta">{{ row.path }}</span>
-        </div>
+        </button>
 
-        <div v-if="row.kind === 'folder'" class="row-actions">
-          <button type="button" @click="createFileAt(row.path)">
+        <div class="row-actions">
+          <button
+            v-if="row.kind === 'folder'"
+            type="button"
+            @click="createFileAt(row.path)"
+          >
             +文件
           </button>
-          <button type="button" @click="createFolderAt(row.path)">
+          <button
+            v-if="row.kind === 'folder'"
+            type="button"
+            @click="createFolderAt(row.path)"
+          >
             +文件夹
+          </button>
+          <button
+            type="button"
+            data-testid="rename-item"
+            @click="renameFile(row.id)"
+          >
+            重命名
+          </button>
+          <button
+            type="button"
+            data-testid="delete-item"
+            @click="deleteFile(row.id)"
+          >
+            删除
           </button>
         </div>
       </li>
@@ -213,6 +315,23 @@ function dropOnRow(row: TreeRow) {
   text-align: center;
 }
 
+.root-dropzone.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.root-dropzone.invalid {
+  border-color: #ef4444;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.drop-message {
+  margin: 0 10px 8px;
+  color: #991b1b;
+  font-size: 12px;
+}
+
 .rows {
   list-style: none;
   margin: 0;
@@ -228,11 +347,27 @@ function dropOnRow(row: TreeRow) {
   padding: 6px 10px;
 }
 
+.row.active {
+  background: #ecfeff;
+}
+
+.row.drop-active {
+  background: #eff6ff;
+}
+
+.row.drop-invalid {
+  background: #fef2f2;
+}
+
 .row-main {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
 }
 
 .kind {
