@@ -1,0 +1,46 @@
+import { Test } from '@nestjs/testing'
+import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify'
+import request from 'supertest'
+import { AppModule } from '../src/app.module'
+import { setupApp } from '../src/app.setup'
+
+describe('Health (e2e)', () => {
+  let app: NestFastifyApplication
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile()
+
+    app = moduleRef.createNestApplication<NestFastifyApplication>(
+      new FastifyAdapter(),
+    )
+
+    setupApp(app)
+    await app.init()
+    await app.getHttpAdapter().getInstance().ready()
+  })
+
+  afterAll(async () => {
+    await app.close()
+  })
+
+  it('GET /health should return ok payload', async () => {
+    const res = await request(app.getHttpServer()).get('/health')
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ status: 'ok' })
+  })
+
+  it('GET /api/not-found should return normalized error payload', async () => {
+    const res = await request(app.getHttpServer()).get('/api/not-found')
+
+    expect(res.status).toBe(404)
+    expect(res.body).toEqual({
+      error: {
+        code: 'NOT_FOUND',
+        message: 'Cannot GET /api/not-found',
+      },
+    })
+  })
+})

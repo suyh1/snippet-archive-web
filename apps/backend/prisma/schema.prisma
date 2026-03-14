@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Workspace {
+  id           String          @id @default(uuid())
+  title        String
+  description  String          @default("")
+  tags         String[]
+  starred      Boolean         @default(false)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  lastOpenedAt DateTime?
+  files        WorkspaceFile[]
+}
+
+model WorkspaceFile {
+  id          String    @id @default(uuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  path        String
+  language    String
+  content     String    @default("")
+  kind        String
+  order       Int
+
+  @@index([workspaceId])
+  @@index([workspaceId, path])
+}

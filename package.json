@@ -1,0 +1,13 @@
+{
+  "name": "snippet-archive-web",
+  "private": true,
+  "workspaces": [
+    "apps/frontend",
+    "apps/backend"
+  ],
+  "scripts": {
+    "dev:frontend": "npm run dev --workspace @snippet-archive/frontend",
+    "dev:backend": "npm run dev --workspace @snippet-archive/backend",
+    "build": "npm run build --workspace @snippet-archive/frontend && npm run build --workspace @snippet-archive/backend"
+  }
+}
