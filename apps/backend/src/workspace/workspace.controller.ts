@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common'
 import { CreateWorkspaceDto } from './dto/create-workspace.dto'
 import { CreateWorkspaceFileDto } from './dto/create-workspace-file.dto'
+import { MoveWorkspaceFileDto } from './dto/move-workspace-file.dto'
 import { UpdateWorkspaceDto } from './dto/update-workspace.dto'
 import { UpdateWorkspaceFileDto } from './dto/update-workspace-file.dto'
 import { WorkspaceService } from './workspace.service'
@@ -84,6 +85,21 @@ export class WorkspaceController {
     @Body() dto: UpdateWorkspaceFileDto,
   ) {
     const file = await this.workspaceService.updateWorkspaceFile(
+      workspaceId,
+      fileId,
+      dto,
+    )
+
+    return { data: file }
+  }
+
+  @Patch(':workspaceId/files/:fileId/move')
+  async moveWorkspaceFile(
+    @Param('workspaceId', new ParseUUIDPipe()) workspaceId: string,
+    @Param('fileId', new ParseUUIDPipe()) fileId: string,
+    @Body() dto: MoveWorkspaceFileDto,
+  ) {
+    const file = await this.workspaceService.moveWorkspaceFile(
       workspaceId,
       fileId,
       dto,

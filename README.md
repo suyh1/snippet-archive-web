@@ -27,7 +27,9 @@
 
 - `apps/backend` 已切换为 NestJS（Fastify Adapter）模块化架构。
 - 已实现 Workspace API v1（含 `WorkspaceFile` 子资源 CRUD）。
+- 已实现 `PATCH /api/workspaces/:workspaceId/files/:fileId/move`（支持文件夹递归移动）。
 - 已接入 `class-validator` + 全局异常过滤器，统一校验与错误响应。
+- 前端已接入真实后端，完成 Library / Workspace 双态与文件树拖拽移动主链路。
 
 ## 快速开始
 
@@ -72,6 +74,13 @@ npm run build
 
 ```bash
 npm run test:e2e --workspace @snippet-archive/backend
+```
+
+### 6. 前端测试与类型检查
+
+```bash
+npm run test:run --workspace @snippet-archive/frontend
+npm run typecheck --workspace @snippet-archive/frontend
 ```
 
 ## 下一步开发说明

@@ -69,7 +69,7 @@ describe('Workspace file API (e2e)', () => {
 
     expect(patchRes.status).toBe(200)
     expect(patchRes.body.data.content).toBe('console.log(2)')
-    expect(patchRes.body.data.order).toBe(2)
+    expect(patchRes.body.data.order).toBe(1)
 
     const deleteRes = await request(app.getHttpServer()).delete(
       `/api/workspaces/${workspace.id}/files/${fileId}`,
@@ -123,5 +123,151 @@ describe('Workspace file API (e2e)', () => {
 
     expect(res.status).toBe(404)
     expect(res.body.error.code).toBe('NOT_FOUND')
+  })
+
+  it('moves a file into another folder and keeps sibling order normalized', async () => {
+    const workspace = await prisma.workspace.create({
+      data: {
+        title: 'Move Workspace',
+        description: '',
+        tags: [],
+        starred: false,
+      },
+    })
+
+    const targetFolder = await prisma.workspaceFile.create({
+      data: {
+        workspaceId: workspace.id,
+        name: 'dst',
+        path: '/dst',
+        language: 'plaintext',
+        content: '',
+        kind: 'folder',
+        order: 1,
+      },
+    })
+
+    const file = await prisma.workspaceFile.create({
+      data: {
+        workspaceId: workspace.id,
+        name: 'a.ts',
+        path: '/a.ts',
+        language: 'typescript',
+        content: '',
+        kind: 'file',
+        order: 2,
+      },
+    })
+
+    const moveRes = await request(app.getHttpServer())
+      .patch(`/api/workspaces/${workspace.id}/files/${file.id}/move`)
+      .send({
+        targetPath: `${targetFolder.path}/a.ts`,
+        targetOrder: 1,
+      })
+
+    expect(moveRes.status).toBe(200)
+    expect(moveRes.body.data.path).toBe('/dst/a.ts')
+    expect(moveRes.body.data.order).toBe(1)
+
+    const listRes = await request(app.getHttpServer()).get(
+      `/api/workspaces/${workspace.id}/files`,
+    )
+
+    expect(listRes.status).toBe(200)
+    expect(listRes.body.data.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: '/dst', order: 1 }),
+        expect.objectContaining({ path: '/dst/a.ts', order: 1 }),
+      ]),
+    )
+  })
+
+  it('moves folder recursively and updates descendant paths', async () => {
+    const workspace = await prisma.workspace.create({
+      data: {
+        title: 'Recursive Move',
+        description: '',
+        tags: [],
+        starred: false,
+      },
+    })
+
+    const folder = await prisma.workspaceFile.create({
+      data: {
+        workspaceId: workspace.id,
+        name: 'src',
+        path: '/src',
+        language: 'plaintext',
+        content: '',
+        kind: 'folder',
+        order: 1,
+      },
+    })
+
+    await prisma.workspaceFile.create({
+      data: {
+        workspaceId: workspace.id,
+        name: 'main.ts',
+        path: '/src/main.ts',
+        language: 'typescript',
+        content: '',
+        kind: 'file',
+        order: 1,
+      },
+    })
+
+    const moveRes = await request(app.getHttpServer())
+      .patch(`/api/workspaces/${workspace.id}/files/${folder.id}/move`)
+      .send({
+        targetPath: '/archived/src',
+      })
+
+    expect(moveRes.status).toBe(200)
+    expect(moveRes.body.data.path).toBe('/archived/src')
+
+    const listRes = await request(app.getHttpServer()).get(
+      `/api/workspaces/${workspace.id}/files`,
+    )
+
+    expect(listRes.status).toBe(200)
+    expect(listRes.body.data.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: '/archived/src' }),
+        expect.objectContaining({ path: '/archived/src/main.ts' }),
+      ]),
+    )
+  })
+
+  it('rejects moving folder into its own descendant', async () => {
+    const workspace = await prisma.workspace.create({
+      data: {
+        title: 'Invalid Move',
+        description: '',
+        tags: [],
+        starred: false,
+      },
+    })
+
+    const folder = await prisma.workspaceFile.create({
+      data: {
+        workspaceId: workspace.id,
+        name: 'src',
+        path: '/src',
+        language: 'plaintext',
+        content: '',
+        kind: 'folder',
+        order: 1,
+      },
+    })
+
+    const moveRes = await request(app.getHttpServer())
+      .patch(`/api/workspaces/${workspace.id}/files/${folder.id}/move`)
+      .send({
+        targetPath: '/src/child/src',
+      })
+
+    expect(moveRes.status).toBe(409)
+    expect(moveRes.body.error.code).toBe('CONFLICT')
   })
 })
