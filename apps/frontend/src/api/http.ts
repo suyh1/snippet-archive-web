@@ -31,12 +31,17 @@ type ApiSuccessPayload<T> = {
 }
 
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers)
+  const hasBody = init?.body !== undefined && init?.body !== null
+  const isFormData = typeof FormData !== 'undefined' && init?.body instanceof FormData
+
+  if (hasBody && !isFormData && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+
   const response = await fetch(`/api${path}`, {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
+    headers,
   })
 
   const payload = (await response.json().catch(() => null)) as

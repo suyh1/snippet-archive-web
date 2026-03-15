@@ -384,7 +384,7 @@ export const useWorkspaceStore = defineStore('workspace', {
     async deleteFile(fileId: string) {
       const workspaceId = this.currentWorkspaceId
       if (!workspaceId) {
-        return
+        return false
       }
 
       this.errorMessage = null
@@ -398,22 +398,22 @@ export const useWorkspaceStore = defineStore('workspace', {
           error,
           '删除失败，请稍后重试。',
         )
-        return
+        return false
       }
 
       if (!target) {
-        return
+        return true
       }
 
       if (this.activeFileId === fileId) {
         this.resetEditor()
-        return
+        return true
       }
 
       const active = this.files.find((item) => item.id === this.activeFileId)
       if (!active) {
         this.resetEditor()
-        return
+        return true
       }
 
       if (target.kind === 'folder') {
@@ -426,6 +426,37 @@ export const useWorkspaceStore = defineStore('workspace', {
         ) {
           this.resetEditor()
         }
+      }
+
+      return true
+    },
+
+    async restoreDeletedFile(snapshot: WorkspaceFile) {
+      const workspaceId = this.currentWorkspaceId
+      if (!workspaceId || snapshot.workspaceId !== workspaceId) {
+        return false
+      }
+
+      this.errorMessage = null
+
+      try {
+        await workspaceApi.createFile(workspaceId, {
+          name: snapshot.name,
+          path: snapshot.path,
+          language: snapshot.language,
+          content: snapshot.content,
+          kind: snapshot.kind,
+          order: snapshot.order,
+        })
+
+        await this.loadWorkspaceFiles()
+        return true
+      } catch (error) {
+        this.errorMessage = resolveWorkspaceErrorMessage(
+          error,
+          '撤销删除失败，请稍后重试。',
+        )
+        return false
       }
     },
   },

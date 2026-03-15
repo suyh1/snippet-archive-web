@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import type { WorkspaceFile } from '@/types/workspace'
 import { getParentPath, joinPath, normalizePath } from '@/utils/path'
 import { validateRenameInput } from '@/utils/rename-validation'
@@ -55,6 +55,12 @@ const renameInputRef = ref<HTMLInputElement | HTMLInputElement[] | null>(null)
 
 const createValidationMessage = ref<string | null>(null)
 const renameValidationMessage = ref<string | null>(null)
+const expandedFolders = ref<Record<string, boolean>>({})
+const visibleSegment = ref(1)
+const pendingDeleteFileId = ref<string | null>(null)
+let pendingDeleteTimer: number | null = null
+
+const ROWS_PER_SEGMENT = 16
 
 const baseRows = computed<TreeRow[]>(() => {
   const sorted = [...props.files].sort((a, b) => {
@@ -129,6 +135,28 @@ const rows = computed<TreeRow[]>(() => {
   return mapped
 })
 
+const collapsedRows = computed<TreeRow[]>(() => {
+  return rows.value.filter((row) => !isDescendantOfCollapsedFolder(row.path))
+})
+
+const totalSegments = computed(() => {
+  if (collapsedRows.value.length === 0) {
+    return 1
+  }
+
+  return Math.ceil(collapsedRows.value.length / ROWS_PER_SEGMENT)
+})
+
+const visibleRows = computed<TreeRow[]>(() => {
+  const startIndex = (visibleSegment.value - 1) * ROWS_PER_SEGMENT
+  return collapsedRows.value.slice(startIndex, startIndex + ROWS_PER_SEGMENT)
+})
+
+const hiddenAfterCount = computed(() => {
+  const shown = visibleSegment.value * ROWS_PER_SEGMENT
+  return Math.max(0, collapsedRows.value.length - shown)
+})
+
 function getCreateInputElement() {
   const input = createInputRef.value
   if (Array.isArray(input)) {
@@ -154,6 +182,7 @@ watch(
       return
     }
 
+    jumpToRow('__create_draft__')
     await nextTick()
     const input = getCreateInputElement()
     if (input && typeof input.focus === 'function') {
@@ -183,8 +212,42 @@ watch(
   },
 )
 
+watch(
+  () => props.files,
+  (files) => {
+    const nextState: Record<string, boolean> = {}
+
+    for (const item of files) {
+      if (item.kind !== 'folder') {
+        continue
+      }
+
+      const normalizedPath = normalizePath(item.path)
+      nextState[normalizedPath] = expandedFolders.value[normalizedPath] ?? true
+    }
+
+    expandedFolders.value = nextState
+  },
+  { immediate: true, deep: true },
+)
+
+watch(
+  () => collapsedRows.value.length,
+  () => {
+    if (visibleSegment.value > totalSegments.value) {
+      visibleSegment.value = totalSegments.value
+    }
+
+    if (visibleSegment.value < 1) {
+      visibleSegment.value = 1
+    }
+  },
+)
+
 function beginCreate(kind: 'file' | 'folder', parentPath: string) {
   cancelRenameDraft()
+  cancelPendingFileDelete()
+  ensureExpandedPath(parentPath)
 
   createDraft.value = {
     kind,
@@ -280,6 +343,7 @@ function onCreateDraftEscape(event: KeyboardEvent) {
 
 function beginRename(row: TreeRow) {
   cancelCreateDraft()
+  cancelPendingFileDelete()
 
   renameDraft.value = {
     fileId: row.id,
@@ -288,6 +352,82 @@ function beginRename(row: TreeRow) {
     name: row.name,
   }
   renameValidationMessage.value = null
+}
+
+function isFolderExpanded(path: string) {
+  const normalizedPath = normalizePath(path)
+  return expandedFolders.value[normalizedPath] ?? true
+}
+
+function toggleFolder(path: string) {
+  const normalizedPath = normalizePath(path)
+  expandedFolders.value = {
+    ...expandedFolders.value,
+    [normalizedPath]: !isFolderExpanded(normalizedPath),
+  }
+}
+
+function isDescendantOfCollapsedFolder(path: string) {
+  const normalizedPath = normalizePath(path)
+  const segments = normalizedPath.split('/').filter(Boolean)
+
+  if (segments.length <= 1) {
+    return false
+  }
+
+  let currentPath = ''
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    currentPath += `/${segments[index]}`
+    if (!isFolderExpanded(currentPath)) {
+      return true
+    }
+  }
+
+  return false
+}
+
+function ensureExpandedPath(path: string) {
+  const normalizedPath = normalizePath(path)
+  const segments = normalizedPath.split('/').filter(Boolean)
+
+  if (segments.length === 0) {
+    return
+  }
+
+  const nextState = { ...expandedFolders.value }
+  let currentPath = ''
+  for (const segment of segments) {
+    currentPath += `/${segment}`
+    nextState[currentPath] = true
+  }
+
+  expandedFolders.value = nextState
+}
+
+function jumpToRow(rowId: string) {
+  const index = collapsedRows.value.findIndex((row) => row.id === rowId)
+  if (index < 0) {
+    visibleSegment.value = 1
+    return
+  }
+
+  visibleSegment.value = Math.floor(index / ROWS_PER_SEGMENT) + 1
+}
+
+function showNextSegment() {
+  if (visibleSegment.value >= totalSegments.value) {
+    return
+  }
+
+  visibleSegment.value += 1
+}
+
+function showPreviousSegment() {
+  if (visibleSegment.value <= 1) {
+    return
+  }
+
+  visibleSegment.value -= 1
 }
 
 function getRenameSiblingNames() {
@@ -488,6 +628,65 @@ function selectFile(fileId: string) {
 function deleteFile(fileId: string) {
   emit('delete-file', fileId)
 }
+
+function clearPendingDeleteTimer() {
+  if (pendingDeleteTimer !== null) {
+    window.clearTimeout(pendingDeleteTimer)
+    pendingDeleteTimer = null
+  }
+}
+
+function schedulePendingDeleteReset() {
+  clearPendingDeleteTimer()
+  pendingDeleteTimer = window.setTimeout(() => {
+    pendingDeleteFileId.value = null
+    pendingDeleteTimer = null
+  }, 5000)
+}
+
+function startFileDeleteConfirm(fileId: string) {
+  pendingDeleteFileId.value = fileId
+  schedulePendingDeleteReset()
+}
+
+function cancelPendingFileDelete() {
+  pendingDeleteFileId.value = null
+  clearPendingDeleteTimer()
+}
+
+function confirmFileDelete(fileId: string) {
+  if (pendingDeleteFileId.value !== fileId) {
+    return
+  }
+
+  cancelPendingFileDelete()
+  emit('delete-file', fileId)
+}
+
+function onRowClick(row: TreeRow, event: MouseEvent) {
+  if (row.draft || renameDraft.value?.fileId === row.id) {
+    return
+  }
+
+  const target = event.target as HTMLElement | null
+  if (!target) {
+    selectFile(row.id)
+    return
+  }
+
+  if (
+    target.closest('.row-actions') ||
+    target.closest('.folder-toggle')
+  ) {
+    return
+  }
+
+  selectFile(row.id)
+}
+
+onBeforeUnmount(() => {
+  clearPendingDeleteTimer()
+})
 </script>
 
 <template>
@@ -518,9 +717,9 @@ function deleteFile(fileId: string) {
 
     <p v-if="loading" class="hint">文件加载中...</p>
 
-    <ul v-else-if="rows.length > 0" class="rows">
+    <ul v-else-if="collapsedRows.length > 0" class="rows">
       <li
-        v-for="row in rows"
+        v-for="row in visibleRows"
         :key="row.id"
         data-testid="tree-row"
         :class="[
@@ -532,6 +731,7 @@ function deleteFile(fileId: string) {
           { 'drop-invalid': !row.draft && renameDraft?.fileId !== row.id && invalidTargetPath === (row.kind === 'folder' ? row.path : getParentPath(row.path)) },
         ]"
         :draggable="!row.draft && renameDraft?.fileId !== row.id"
+        @click="onRowClick(row, $event)"
         @dragstart="dragStart(row.id)"
         @dragend="dragEnd"
         @dragover.prevent="dragOverRow(row)"
@@ -594,50 +794,108 @@ function deleteFile(fileId: string) {
         </template>
 
         <template v-else>
-          <button
-            type="button"
+          <div
             class="row-main"
             :style="{ paddingLeft: `${row.depth * 16 + 8}px` }"
-            @click="selectFile(row.id)"
           >
-            <span class="kind">{{ row.kind === 'folder' ? '📁' : '📄' }}</span>
-            <span class="name">{{ row.name }}</span>
-            <span class="meta">{{ row.path }}</span>
-          </button>
+            <button
+              v-if="row.kind === 'folder'"
+              type="button"
+              class="folder-toggle"
+              :data-testid="`toggle-folder-${row.id}`"
+              :aria-label="isFolderExpanded(row.path) ? '折叠文件夹' : '展开文件夹'"
+              @click="toggleFolder(row.path)"
+            >
+              {{ isFolderExpanded(row.path) ? '▾' : '▸' }}
+            </button>
+            <span v-else class="folder-toggle-placeholder" aria-hidden="true" />
+
+            <button
+              type="button"
+              class="row-select"
+              @click.stop="selectFile(row.id)"
+            >
+              <span class="kind">{{ row.kind === 'folder' ? '📁' : '📄' }}</span>
+              <span class="name">{{ row.name }}</span>
+              <span class="meta">{{ row.path }}</span>
+            </button>
+          </div>
 
           <div class="row-actions">
-            <button
-              v-if="row.kind === 'folder'"
-              type="button"
-              @click="beginCreate('file', row.path)"
-            >
-              +文件
-            </button>
-            <button
-              v-if="row.kind === 'folder'"
-              type="button"
-              @click="beginCreate('folder', row.path)"
-            >
-              +文件夹
-            </button>
-            <button
-              type="button"
-              data-testid="rename-item"
-              @click="beginRename(row)"
-            >
-              重命名
-            </button>
-            <button
-              type="button"
-              data-testid="delete-item"
-              @click="deleteFile(row.id)"
-            >
-              删除
-            </button>
+            <template v-if="row.kind === 'file' && pendingDeleteFileId === row.id">
+              <button
+                type="button"
+                class="danger-action"
+                data-testid="confirm-delete-file"
+                @click="confirmFileDelete(row.id)"
+              >
+                确认删除
+              </button>
+              <button
+                type="button"
+                data-testid="cancel-delete-file"
+                @click="cancelPendingFileDelete"
+              >
+                取消
+              </button>
+            </template>
+
+            <template v-else>
+              <button
+                v-if="row.kind === 'folder'"
+                type="button"
+                @click="beginCreate('file', row.path)"
+              >
+                +文件
+              </button>
+              <button
+                v-if="row.kind === 'folder'"
+                type="button"
+                @click="beginCreate('folder', row.path)"
+              >
+                +文件夹
+              </button>
+              <button
+                type="button"
+                data-testid="rename-item"
+                @click="beginRename(row)"
+              >
+                重命名
+              </button>
+              <button
+                type="button"
+                data-testid="delete-item"
+                @click="row.kind === 'file' ? startFileDeleteConfirm(row.id) : deleteFile(row.id)"
+              >
+                删除
+              </button>
+            </template>
           </div>
         </template>
       </li>
     </ul>
+
+    <div v-if="!loading && collapsedRows.length > 0" class="rows-footer">
+      <button
+        v-if="visibleSegment > 1"
+        type="button"
+        data-testid="show-previous-rows"
+        @click="showPreviousSegment"
+      >
+        上一组
+      </button>
+      <p class="rows-indicator" data-testid="rows-segment-indicator">
+        {{ visibleSegment }} / {{ totalSegments }}
+      </p>
+      <button
+        v-if="hiddenAfterCount > 0"
+        type="button"
+        data-testid="show-more-rows"
+        @click="showNextSegment"
+      >
+        显示更多（剩余 {{ hiddenAfterCount }} 项）
+      </button>
+    </div>
 
     <div v-if="createValidationMessage" class="create-error" data-testid="create-inline-error">
       {{ createValidationMessage }}
@@ -646,7 +904,7 @@ function deleteFile(fileId: string) {
       {{ renameValidationMessage }}
     </div>
 
-    <p v-if="!loading && rows.length === 0" class="hint">当前工作区还没有文件，点击「新建文件」开始。</p>
+    <p v-if="!loading && collapsedRows.length === 0" class="hint">当前工作区还没有文件，点击「新建文件」开始。</p>
   </section>
 </template>
 
@@ -657,6 +915,10 @@ function deleteFile(fileId: string) {
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.64), rgba(224, 242, 254, 0.4));
   backdrop-filter: blur(12px);
   box-shadow: 0 16px 32px rgba(15, 23, 42, 0.09);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -722,6 +984,9 @@ function deleteFile(fileId: string) {
   list-style: none;
   margin: 0;
   padding: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .row {
@@ -758,14 +1023,42 @@ function deleteFile(fileId: string) {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
 }
 
 .row-main.draft-main {
   cursor: text;
+}
+
+.folder-toggle {
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.7);
+  color: #0f172a;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.folder-toggle-placeholder {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.row-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+  color: inherit;
+  flex: 1;
 }
 
 .draft-input {
@@ -800,6 +1093,8 @@ function deleteFile(fileId: string) {
 .row-actions {
   display: flex;
   gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .row-actions button {
@@ -817,10 +1112,41 @@ function deleteFile(fileId: string) {
   color: #7f1d1d;
 }
 
+.row-actions .danger-action {
+  border-color: rgba(248, 113, 113, 0.65);
+  background: rgba(220, 38, 38, 0.86);
+  color: #fef2f2;
+}
+
 .create-error {
   margin: 0 10px 8px;
   color: #b91c1c;
   font-size: 12px;
+}
+
+.rows-footer {
+  margin: 0 10px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rows-footer button {
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(255, 255, 255, 0.8);
+  color: #0f172a;
+  border-radius: 8px;
+  padding: 5px 9px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.rows-indicator {
+  margin: 0;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .hint {

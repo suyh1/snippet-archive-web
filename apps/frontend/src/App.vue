@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import CodeEditor, { type CodeEditorTheme } from '@/features/workspace/CodeEditor.vue'
+import ConfirmDialog from '@/features/workspace/ConfirmDialog.vue'
 import FileTree from '@/features/workspace/FileTree.vue'
 import UnsavedChangesDialog from '@/features/workspace/UnsavedChangesDialog.vue'
 import WorkspaceSidebar from '@/features/workspace/WorkspaceSidebar.vue'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import { useWorkspaceStore } from '@/stores/workspace.store'
+import type { WorkspaceFile } from '@/types/workspace'
 
 const workspaceStore = useWorkspaceStore()
 
@@ -30,6 +32,18 @@ const canSave = computed(() => {
 })
 
 const resolvingUnsavedSave = ref(false)
+const deleteConfirm = ref<{
+  kind: 'workspace' | 'folder'
+  id: string
+  title: string
+  message: string
+  confirmText: string
+} | null>(null)
+const deleteConfirmLoading = ref(false)
+
+const deletedFileToast = ref<WorkspaceFile | null>(null)
+const undoingFileDelete = ref(false)
+let deletedFileToastTimer: number | null = null
 const {
   dialogOpen: unsavedDialogOpen,
   requestDecision,
@@ -103,13 +117,13 @@ function createWorkspace(title: string) {
 
 function deleteWorkspace(workspaceId: string) {
   const target = workspaces.value.find((item) => item.id === workspaceId)
-  const confirmed = window.confirm(`确认删除工作区「${target?.title ?? workspaceId}」？`)
-
-  if (!confirmed) {
-    return
+  deleteConfirm.value = {
+    kind: 'workspace',
+    id: workspaceId,
+    title: '确认删除工作区',
+    message: `删除「${target?.title ?? workspaceId}」后将不可恢复。`,
+    confirmText: '确认删除',
   }
-
-  void workspaceStore.deleteWorkspace(workspaceId)
 }
 
 function backToLibrary() {
@@ -152,18 +166,114 @@ function renameFile(payload: { fileId: string; newName: string }) {
 
 function deleteFile(fileId: string) {
   const target = files.value.find((item) => item.id === fileId)
-  const confirmed = window.confirm(`确认删除「${target?.name ?? fileId}」？`)
-
-  if (!confirmed) {
+  if (!target) {
     return
   }
 
-  void workspaceStore.deleteFile(fileId)
+  if (target.kind === 'folder') {
+    deleteConfirm.value = {
+      kind: 'folder',
+      id: fileId,
+      title: '确认删除文件夹',
+      message: `删除「${target.name}」及其所有子项后将不可恢复。`,
+      confirmText: '确认删除',
+    }
+    return
+  }
+
+  void deleteFileWithUndo(fileId)
 }
 
 function saveFile() {
   void workspaceStore.saveCurrentFile()
 }
+
+function clearDeletedFileToastTimer() {
+  if (deletedFileToastTimer !== null) {
+    window.clearTimeout(deletedFileToastTimer)
+    deletedFileToastTimer = null
+  }
+}
+
+function hideDeletedFileToast() {
+  deletedFileToast.value = null
+  undoingFileDelete.value = false
+  clearDeletedFileToastTimer()
+}
+
+function showDeletedFileToast(file: WorkspaceFile) {
+  deletedFileToast.value = { ...file }
+  undoingFileDelete.value = false
+  clearDeletedFileToastTimer()
+  deletedFileToastTimer = window.setTimeout(() => {
+    hideDeletedFileToast()
+  }, 6000)
+}
+
+async function deleteFileWithUndo(fileId: string) {
+  const target = files.value.find((item) => item.id === fileId)
+  if (!target || target.kind !== 'file') {
+    return
+  }
+
+  const snapshot = { ...target }
+  const deleted = await workspaceStore.deleteFile(fileId)
+  if (!deleted) {
+    return
+  }
+
+  showDeletedFileToast(snapshot)
+}
+
+async function undoDeletedFile() {
+  if (!deletedFileToast.value) {
+    return
+  }
+
+  undoingFileDelete.value = true
+  const restored = await workspaceStore.restoreDeletedFile(deletedFileToast.value)
+  undoingFileDelete.value = false
+
+  if (restored) {
+    hideDeletedFileToast()
+  }
+}
+
+function cancelDeleteConfirm() {
+  if (deleteConfirmLoading.value) {
+    return
+  }
+
+  deleteConfirm.value = null
+}
+
+async function confirmDelete() {
+  if (!deleteConfirm.value) {
+    return
+  }
+
+  deleteConfirmLoading.value = true
+
+  if (deleteConfirm.value.kind === 'workspace') {
+    await workspaceStore.deleteWorkspace(deleteConfirm.value.id)
+  } else {
+    await workspaceStore.deleteFile(deleteConfirm.value.id)
+  }
+
+  deleteConfirmLoading.value = false
+  deleteConfirm.value = null
+}
+
+watch(
+  () => currentWorkspaceId.value,
+  () => {
+    hideDeletedFileToast()
+  },
+)
+
+onBeforeUnmount(() => {
+  clearDeletedFileToastTimer()
+})
 </script>
 
 <template>
@@ -299,6 +409,35 @@ function saveFile() {
       </section>
     </section>
 
+    <div
+      v-if="deletedFileToast"
+      class="undo-toast"
+      data-testid="file-delete-toast"
+      role="status"
+      aria-live="polite"
+    >
+      <p>已删除文件「{{ deletedFileToast.name }}」。</p>
+      <button
+        type="button"
+        data-testid="undo-delete-file"
+        :disabled="undoingFileDelete"
+        @click="undoDeletedFile"
+      >
+        {{ undoingFileDelete ? '恢复中...' : '撤销' }}
+      </button>
+    </div>
+
+    <ConfirmDialog
+      :open="!!deleteConfirm"
+      :title="deleteConfirm?.title ?? ''"
+      :message="deleteConfirm?.message ?? ''"
+      :confirm-text="deleteConfirm?.confirmText"
+      :loading="deleteConfirmLoading"
+      danger
+      @confirm="confirmDelete"
+      @cancel="cancelDeleteConfirm"
+    />
+
     <UnsavedChangesDialog
       :open="unsavedDialogOpen"
       :saving="resolvingUnsavedSave"
@@ -311,10 +450,11 @@ function saveFile() {
 
 <style scoped>
 .app-shell {
-  min-height: 100vh;
+  height: 100vh;
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
   font-family: 'Manrope', 'Plus Jakarta Sans', 'Avenir Next', sans-serif;
+  overflow: hidden;
   background:
     radial-gradient(circle at 12% 8%, rgba(56, 189, 248, 0.26), transparent 40%),
     radial-gradient(circle at 88% 0%, rgba(20, 184, 166, 0.24), transparent 36%),
@@ -324,9 +464,11 @@ function saveFile() {
 
 .content {
   padding: 16px 18px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  align-content: start;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .content-head {
@@ -371,9 +513,24 @@ h2 {
 
 .library-view,
 .workspace-view {
+  min-height: 0;
+}
+
+.library-view {
   display: grid;
   gap: 10px;
   align-content: start;
+  flex: 1 1 auto;
+  overflow: auto;
+}
+
+.workspace-view {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .summary-card {
@@ -464,6 +621,9 @@ h2 {
   grid-template-columns: minmax(330px, 42%) minmax(0, 58%);
   gap: 10px;
   align-items: stretch;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .editor-panel {
@@ -474,7 +634,8 @@ h2 {
   box-shadow: 0 16px 32px rgba(15, 23, 42, 0.1);
   display: grid;
   grid-template-rows: auto 1fr;
-  min-height: 520px;
+  min-height: 0;
+  height: 100%;
 }
 
 .editor-head {
@@ -554,15 +715,54 @@ h2 {
   padding: 16px;
 }
 
+.undo-toast {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 62;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.85));
+  color: #e2e8f0;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.28);
+  backdrop-filter: blur(8px);
+}
+
+.undo-toast p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.undo-toast button {
+  border: 1px solid rgba(56, 189, 248, 0.6);
+  border-radius: 9px;
+  background: rgba(14, 165, 233, 0.2);
+  color: #e0f2fe;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.undo-toast button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 @media (max-width: 1200px) {
   .workspace-main {
     grid-template-columns: 1fr;
+    grid-template-rows: minmax(260px, 1fr) minmax(320px, 1fr);
   }
 }
 
 @media (max-width: 960px) {
   .app-shell {
     grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .content-head {
