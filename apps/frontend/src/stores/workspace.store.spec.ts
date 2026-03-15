@@ -18,6 +18,7 @@ vi.mock('@/api/workspaces', () => {
 })
 
 import { workspaceApi } from '@/api/workspaces'
+import { ApiClientError } from '@/api/http'
 import { useWorkspaceStore } from './workspace.store'
 
 describe('workspace store', () => {
@@ -181,5 +182,16 @@ describe('workspace store', () => {
 
     expect(workspaceApi.deleteFile).toHaveBeenCalledWith('w1', 'f1')
     expect(store.activeFileId).toBe(null)
+  })
+
+  it('maps conflict error to friendly message when creating workspace', async () => {
+    vi.mocked(workspaceApi.create).mockRejectedValue(
+      new ApiClientError(409, 'Path already exists', 'CONFLICT'),
+    )
+
+    const store = useWorkspaceStore()
+    await store.createWorkspace('Workspace 1')
+
+    expect(store.errorMessage).toBe('名称或路径已存在，请修改后重试。')
   })
 })

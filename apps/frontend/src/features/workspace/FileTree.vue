@@ -183,10 +183,10 @@ function deleteFile(fileId: string) {
     <header class="tree-header">
       <h3>Files</h3>
       <div class="tree-actions">
-        <button type="button" @click="createFileAt('/')">
+        <button type="button" data-testid="create-file-root" @click="createFileAt('/')">
           新建文件
         </button>
-        <button type="button" @click="createFolderAt('/')">
+        <button type="button" data-testid="create-folder-root" @click="createFolderAt('/')">
           新建文件夹
         </button>
       </div>
@@ -210,6 +210,7 @@ function deleteFile(fileId: string) {
       <li
         v-for="row in rows"
         :key="row.id"
+        data-testid="tree-row"
         :class="[
           'row',
           { active: row.id === props.activeFileId },
@@ -266,7 +267,7 @@ function deleteFile(fileId: string) {
       </li>
     </ul>
 
-    <p v-else class="hint">当前工作区还没有文件。</p>
+    <p v-else class="hint">当前工作区还没有文件，点击「新建文件」开始。</p>
   </section>
 </template>
 

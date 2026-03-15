@@ -16,7 +16,7 @@ export async function createTestApp() {
     new FastifyAdapter(),
   )
 
-  setupApp(app)
+  await setupApp(app)
 
   await app.init()
   await app.getHttpAdapter().getInstance().ready()

@@ -1,9 +1,15 @@
+export type ApiErrorCode =
+  | 'VALIDATION_ERROR'
+  | 'NOT_FOUND'
+  | 'CONFLICT'
+  | 'INTERNAL_ERROR'
+
 export class ApiClientError extends Error {
-  readonly code?: string
+  readonly code?: ApiErrorCode
   readonly details?: unknown
   readonly status: number
 
-  constructor(status: number, message: string, code?: string, details?: unknown) {
+  constructor(status: number, message: string, code?: ApiErrorCode, details?: unknown) {
     super(message)
     this.name = 'ApiClientError'
     this.status = status
@@ -14,7 +20,7 @@ export class ApiClientError extends Error {
 
 type ApiErrorPayload = {
   error?: {
-    code?: string
+    code?: ApiErrorCode
     message?: string
     details?: unknown
   }

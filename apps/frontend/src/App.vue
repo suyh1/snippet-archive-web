@@ -175,7 +175,7 @@ function saveFile() {
           </button>
 
           <p v-if="workspaces.length === 0" class="empty-note">
-            还没有任何工作区，先从左侧「新建」开始。
+            还没有任何工作区，先从左侧「新建」创建第一个工作区。
           </p>
         </div>
       </section>
@@ -221,7 +221,7 @@ function saveFile() {
             />
 
             <p v-else class="editor-empty">
-              请选择一个文件开始编辑。
+              先在左侧创建或选择文件，然后开始编辑。
             </p>
           </section>
         </div>

@@ -31,6 +31,9 @@
 - 已接入 `class-validator` + 全局异常过滤器，统一校验与错误响应。
 - 前端已接入真实后端，完成 Library / Workspace 双态与文件树拖拽移动主链路。
 - 前端已接入文件编辑保存、重命名/删除入口与拖拽反馈增强。
+- 已接入 Swagger UI，文档入口为 `/docs`。
+- 已增加 Playwright 冒烟 e2e（新建 workspace -> 新建文件 -> 拖拽移动）。
+- 已统一错误提示文案与关键空状态提示。
 
 ## 快速开始
 
@@ -77,16 +80,18 @@ npm run build
 npm run test:e2e --workspace @snippet-archive/backend
 ```
 
-### 6. 前端测试与类型检查
+### 6. 前端测试、类型检查与冒烟 e2e
 
 ```bash
 npm run test:run --workspace @snippet-archive/frontend
 npm run typecheck --workspace @snippet-archive/frontend
+npm run test:e2e:smoke --workspace @snippet-archive/frontend
 ```
 
-### 7. OpenAPI 文档
+### 7. OpenAPI 与 Swagger 文档
 
 - `docs/openapi/workspace-v1.yaml`
+- `http://localhost:3001/docs`
 
 ## 下一步开发说明
 

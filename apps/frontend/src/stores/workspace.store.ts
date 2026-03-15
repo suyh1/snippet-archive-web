@@ -6,6 +6,7 @@ import type {
   WorkspaceFile,
 } from '@/types/workspace'
 import { basename, getParentPath, joinPath, normalizePath } from '@/utils/path'
+import { resolveWorkspaceErrorMessage } from '@/utils/error-message'
 
 function inferLanguage(name: string) {
   if (name.endsWith('.ts')) {
@@ -89,8 +90,10 @@ export const useWorkspaceStore = defineStore('workspace', {
       try {
         this.workspaces = await workspaceApi.list()
       } catch (error) {
-        this.errorMessage =
-          error instanceof Error ? error.message : 'Failed to load workspaces'
+        this.errorMessage = resolveWorkspaceErrorMessage(
+          error,
+          '加载工作区失败，请稍后重试。',
+        )
       } finally {
         this.loading = false
       }
@@ -114,8 +117,10 @@ export const useWorkspaceStore = defineStore('workspace', {
         this.resetEditor()
         this.files = await workspaceApi.listFiles(workspaceId)
       } catch (error) {
-        this.errorMessage =
-          error instanceof Error ? error.message : 'Failed to open workspace'
+        this.errorMessage = resolveWorkspaceErrorMessage(
+          error,
+          '打开工作区失败，请稍后重试。',
+        )
       } finally {
         this.loadingFiles = false
       }
@@ -137,8 +142,10 @@ export const useWorkspaceStore = defineStore('workspace', {
         this.resetEditor()
         this.files = await workspaceApi.listFiles(created.id)
       } catch (error) {
-        this.errorMessage =
-          error instanceof Error ? error.message : 'Failed to create workspace'
+        this.errorMessage = resolveWorkspaceErrorMessage(
+          error,
+          '创建工作区失败，请稍后重试。',
+        )
       } finally {
         this.saving = false
       }
@@ -163,8 +170,10 @@ export const useWorkspaceStore = defineStore('workspace', {
           this.resetEditor()
         }
       } catch (error) {
-        this.errorMessage =
-          error instanceof Error ? error.message : 'Failed to delete workspace'
+        this.errorMessage = resolveWorkspaceErrorMessage(
+          error,
+          '删除工作区失败，请稍后重试。',
+        )
       } finally {
         this.saving = false
       }
@@ -184,8 +193,10 @@ export const useWorkspaceStore = defineStore('workspace', {
         this.files = await workspaceApi.listFiles(this.currentWorkspaceId)
         this.syncEditorWithFiles()
       } catch (error) {
-        this.errorMessage =
-          error instanceof Error ? error.message : 'Failed to load files'
+        this.errorMessage = resolveWorkspaceErrorMessage(
+          error,
+          '加载文件列表失败，请稍后重试。',
+        )
       } finally {
         this.loadingFiles = false
       }
@@ -233,8 +244,10 @@ export const useWorkspaceStore = defineStore('workspace', {
         await this.loadWorkspaceFiles()
         this.dirty = false
       } catch (error) {
-        this.errorMessage =
-          error instanceof Error ? error.message : 'Failed to save file'
+        this.errorMessage = resolveWorkspaceErrorMessage(
+          error,
+          '保存文件失败，请稍后重试。',
+        )
       } finally {
         this.saving = false
       }
@@ -255,8 +268,17 @@ export const useWorkspaceStore = defineStore('workspace', {
         order: 9999,
       }
 
-      await workspaceApi.createFile(workspaceId, payload)
-      await this.loadWorkspaceFiles()
+      this.errorMessage = null
+
+      try {
+        await workspaceApi.createFile(workspaceId, payload)
+        await this.loadWorkspaceFiles()
+      } catch (error) {
+        this.errorMessage = resolveWorkspaceErrorMessage(
+          error,
+          '新建文件失败，请稍后重试。',
+        )
+      }
     },
 
     async createFolder(parentPath: string, name: string) {
@@ -274,8 +296,17 @@ export const useWorkspaceStore = defineStore('workspace', {
         order: 9999,
       }
 
-      await workspaceApi.createFile(workspaceId, payload)
-      await this.loadWorkspaceFiles()
+      this.errorMessage = null
+
+      try {
+        await workspaceApi.createFile(workspaceId, payload)
+        await this.loadWorkspaceFiles()
+      } catch (error) {
+        this.errorMessage = resolveWorkspaceErrorMessage(
+          error,
+          '新建文件夹失败，请稍后重试。',
+        )
+      }
     },
 
     async moveFileToParent(fileId: string, targetParentPath: string) {
@@ -294,12 +325,21 @@ export const useWorkspaceStore = defineStore('workspace', {
         return
       }
 
-      await workspaceApi.moveFile(workspaceId, fileId, {
-        targetPath: nextPath,
-        targetOrder: 9999,
-      })
+      this.errorMessage = null
 
-      await this.loadWorkspaceFiles()
+      try {
+        await workspaceApi.moveFile(workspaceId, fileId, {
+          targetPath: nextPath,
+          targetOrder: 9999,
+        })
+
+        await this.loadWorkspaceFiles()
+      } catch (error) {
+        this.errorMessage = resolveWorkspaceErrorMessage(
+          error,
+          '移动文件失败，请稍后重试。',
+        )
+      }
     },
 
     async renameFile(fileId: string, newName: string) {
@@ -320,12 +360,21 @@ export const useWorkspaceStore = defineStore('workspace', {
 
       const targetPath = normalizePath(joinPath(getParentPath(file.path), trimmed))
 
-      await workspaceApi.moveFile(workspaceId, fileId, {
-        targetPath,
-        targetOrder: file.order,
-      })
+      this.errorMessage = null
 
-      await this.loadWorkspaceFiles()
+      try {
+        await workspaceApi.moveFile(workspaceId, fileId, {
+          targetPath,
+          targetOrder: file.order,
+        })
+
+        await this.loadWorkspaceFiles()
+      } catch (error) {
+        this.errorMessage = resolveWorkspaceErrorMessage(
+          error,
+          '重命名失败，请稍后重试。',
+        )
+      }
     },
 
     async deleteFile(fileId: string) {
@@ -334,9 +383,19 @@ export const useWorkspaceStore = defineStore('workspace', {
         return
       }
 
+      this.errorMessage = null
       const target = this.files.find((item) => item.id === fileId)
-      await workspaceApi.deleteFile(workspaceId, fileId)
-      await this.loadWorkspaceFiles()
+
+      try {
+        await workspaceApi.deleteFile(workspaceId, fileId)
+        await this.loadWorkspaceFiles()
+      } catch (error) {
+        this.errorMessage = resolveWorkspaceErrorMessage(
+          error,
+          '删除失败，请稍后重试。',
+        )
+        return
+      }
 
       if (!target) {
         return

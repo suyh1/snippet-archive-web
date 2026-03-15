@@ -4,6 +4,16 @@ import { describe, expect, it } from 'vitest'
 import FileTree from './FileTree.vue'
 
 describe('FileTree', () => {
+  it('shows guided empty state when no files exist', () => {
+    const wrapper = mount(FileTree, {
+      props: {
+        files: [],
+      },
+    })
+
+    expect(wrapper.text()).toContain('当前工作区还没有文件，点击「新建文件」开始。')
+  })
+
   it('emits moveFile when dropping file to root dropzone', async () => {
     const wrapper = mount(FileTree, {
       props: {
