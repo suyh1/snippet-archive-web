@@ -52,21 +52,22 @@ const emit = defineEmits<{
 .dialog-mask {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.35);
+  background: rgba(7, 11, 28, 0.45);
   display: grid;
   place-items: center;
+  backdrop-filter: blur(8px);
   z-index: 60;
 }
 
 .dialog-panel {
   width: min(440px, calc(100vw - 24px));
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.7), rgba(226, 247, 255, 0.55));
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 18px;
   padding: 18px;
   display: grid;
   gap: 12px;
-  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 22px 44px rgba(15, 23, 42, 0.2);
 }
 
 .dialog-panel h3 {
@@ -88,17 +89,17 @@ const emit = defineEmits<{
 }
 
 .dialog-actions button {
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  background: rgba(255, 255, 255, 0.82);
   color: #0f172a;
-  border-radius: 9px;
-  padding: 7px 12px;
+  border-radius: 10px;
+  padding: 8px 12px;
   cursor: pointer;
 }
 
 .dialog-actions button.primary {
-  border-color: #0ea5e9;
-  background: #0ea5e9;
+  border-color: rgba(14, 165, 233, 0.75);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.9), rgba(56, 189, 248, 0.84));
   color: #f8fafc;
 }
 

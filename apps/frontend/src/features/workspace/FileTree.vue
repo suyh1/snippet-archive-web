@@ -273,9 +273,11 @@ function deleteFile(fileId: string) {
 
 <style scoped>
 .file-tree {
-  border: 1px solid #d1d5db;
+  border: 1px solid rgba(255, 255, 255, 0.65);
   border-radius: 16px;
-  background: #ffffff;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.64), rgba(224, 242, 254, 0.4));
+  backdrop-filter: blur(12px);
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.09);
   overflow: hidden;
 }
 
@@ -284,13 +286,14 @@ function deleteFile(fileId: string) {
   align-items: center;
   justify-content: space-between;
   padding: 12px 14px;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f8fafc;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+  background: linear-gradient(120deg, rgba(219, 234, 254, 0.58), rgba(186, 230, 253, 0.3));
 }
 
 .tree-header h3 {
   margin: 0;
   font-size: 16px;
+  color: #0f172a;
 }
 
 .tree-actions {
@@ -299,31 +302,34 @@ function deleteFile(fileId: string) {
 }
 
 .tree-actions button {
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  background: white;
-  padding: 6px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.48);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.74);
+  padding: 6px 10px;
   cursor: pointer;
+  color: #0f172a;
+  font-weight: 600;
 }
 
 .root-dropzone {
   margin: 10px;
-  border: 1px dashed #93c5fd;
+  border: 1px dashed rgba(14, 165, 233, 0.75);
   border-radius: 10px;
-  color: #1d4ed8;
+  color: #0c4a6e;
   font-size: 13px;
   padding: 8px;
   text-align: center;
+  background: rgba(224, 242, 254, 0.45);
 }
 
 .root-dropzone.active {
-  border-color: #2563eb;
-  background: #eff6ff;
+  border-color: #0284c7;
+  background: rgba(186, 230, 253, 0.6);
 }
 
 .root-dropzone.invalid {
   border-color: #ef4444;
-  background: #fef2f2;
+  background: rgba(254, 226, 226, 0.66);
   color: #991b1b;
 }
 
@@ -344,20 +350,20 @@ function deleteFile(fileId: string) {
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 8px;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid rgba(226, 232, 240, 0.72);
   padding: 6px 10px;
 }
 
 .row.active {
-  background: #ecfeff;
+  background: rgba(186, 230, 253, 0.55);
 }
 
 .row.drop-active {
-  background: #eff6ff;
+  background: rgba(191, 219, 254, 0.56);
 }
 
 .row.drop-invalid {
-  background: #fef2f2;
+  background: rgba(254, 226, 226, 0.66);
 }
 
 .row-main {
@@ -378,10 +384,11 @@ function deleteFile(fileId: string) {
 
 .name {
   font-weight: 600;
+  color: #0f172a;
 }
 
 .meta {
-  color: #64748b;
+  color: #475569;
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -394,9 +401,9 @@ function deleteFile(fileId: string) {
 }
 
 .row-actions button {
-  border: 1px solid #dbeafe;
-  background: #eff6ff;
-  color: #1e40af;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(255, 255, 255, 0.72);
+  color: #1e293b;
   border-radius: 8px;
   padding: 4px 8px;
   cursor: pointer;
@@ -404,7 +411,8 @@ function deleteFile(fileId: string) {
 
 .hint {
   margin: 0;
-  padding: 16px;
-  color: #64748b;
+  padding: 14px;
+  color: #334155;
+  font-size: 13px;
 }
 </style>

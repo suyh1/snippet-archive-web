@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 
 const props = defineProps<{
   open: boolean
+  kind: 'file' | 'folder'
   value: string
+  parentPath: string
   errorMessage: string | null
   submitting?: boolean
   confirmDisabled?: boolean
@@ -16,6 +18,10 @@ const emit = defineEmits<{
 }>()
 
 const inputRef = ref<HTMLInputElement | null>(null)
+
+const title = computed(() => {
+  return props.kind === 'file' ? '新建文件' : '新建文件夹'
+})
 
 watch(
   () => props.open,
@@ -31,7 +37,7 @@ watch(
 )
 
 function onEnter(event: KeyboardEvent) {
-  if (props.confirmDisabled || props.submitting) {
+  if (props.submitting || props.confirmDisabled) {
     return
   }
 
@@ -41,15 +47,16 @@ function onEnter(event: KeyboardEvent) {
 </script>
 
 <template>
-  <div v-if="open" class="dialog-mask" data-testid="rename-dialog">
-    <section class="dialog-panel" role="dialog" aria-modal="true" aria-label="重命名">
-      <h3>重命名</h3>
+  <div v-if="open" class="dialog-mask" data-testid="create-node-dialog">
+    <section class="dialog-panel" role="dialog" aria-modal="true" :aria-label="title">
+      <h3>{{ title }}</h3>
+      <p class="desc">父路径：{{ parentPath }}</p>
 
       <label class="field">
         <span>名称</span>
         <input
           ref="inputRef"
-          data-testid="rename-input"
+          data-testid="create-node-input"
           :value="value"
           :disabled="submitting"
           @input="emit('update:value', ($event.target as HTMLInputElement).value)"
@@ -57,23 +64,23 @@ function onEnter(event: KeyboardEvent) {
         >
       </label>
 
-      <p v-if="errorMessage" class="error" data-testid="rename-error">
+      <p v-if="errorMessage" class="error" data-testid="create-node-error">
         {{ errorMessage }}
       </p>
 
       <div class="dialog-actions">
         <button
           type="button"
-          data-testid="rename-confirm"
           class="primary"
+          data-testid="create-node-confirm"
           :disabled="submitting || confirmDisabled"
           @click="emit('confirm')"
         >
-          {{ submitting ? '提交中...' : '确认' }}
+          {{ submitting ? '创建中...' : '确认创建' }}
         </button>
         <button
           type="button"
-          data-testid="rename-cancel"
+          data-testid="create-node-cancel"
           :disabled="submitting"
           @click="emit('cancel')"
         >
@@ -88,28 +95,34 @@ function onEnter(event: KeyboardEvent) {
 .dialog-mask {
   position: fixed;
   inset: 0;
-  background: rgba(7, 11, 28, 0.45);
+  z-index: 80;
   display: grid;
   place-items: center;
+  background: rgba(7, 11, 28, 0.45);
   backdrop-filter: blur(8px);
-  z-index: 70;
 }
 
 .dialog-panel {
-  width: min(440px, calc(100vw - 24px));
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.7), rgba(226, 247, 255, 0.55));
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  width: min(460px, calc(100vw - 24px));
   border-radius: 18px;
   padding: 18px;
   display: grid;
   gap: 12px;
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.7), rgba(226, 247, 255, 0.55));
+  border: 1px solid rgba(255, 255, 255, 0.7);
   box-shadow: 0 22px 44px rgba(15, 23, 42, 0.2);
 }
 
 .dialog-panel h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 19px;
   color: #0f172a;
+}
+
+.desc {
+  margin: 0;
+  color: #334155;
+  font-size: 13px;
 }
 
 .field {
@@ -118,7 +131,7 @@ function onEnter(event: KeyboardEvent) {
 }
 
 .field span {
-  color: #475569;
+  color: #334155;
   font-size: 13px;
 }
 
@@ -145,9 +158,9 @@ function onEnter(event: KeyboardEvent) {
 
 .dialog-actions button {
   border: 1px solid rgba(148, 163, 184, 0.5);
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.82);
   color: #0f172a;
-  border-radius: 10px;
   padding: 8px 12px;
   cursor: pointer;
 }

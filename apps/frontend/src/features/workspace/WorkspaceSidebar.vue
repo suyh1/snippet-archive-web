@@ -85,11 +85,15 @@ function submitCreate() {
 .workspace-sidebar {
   display: grid;
   grid-template-rows: auto auto 1fr;
-  gap: 16px;
-  padding: 20px;
-  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+  align-content: start;
+  gap: 10px;
+  padding: 14px 12px;
+  background:
+    radial-gradient(circle at 14% 12%, rgba(125, 211, 252, 0.24), transparent 45%),
+    radial-gradient(circle at 80% 100%, rgba(20, 184, 166, 0.2), transparent 40%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(30, 41, 59, 0.9));
   color: #e2e8f0;
-  border-right: 1px solid #334155;
+  border-right: 1px solid rgba(148, 163, 184, 0.28);
 }
 
 .sidebar-head {
@@ -101,37 +105,38 @@ function submitCreate() {
 
 h1 {
   margin: 0;
-  font-size: 18px;
-  letter-spacing: 0.03em;
+  font-size: 17px;
+  letter-spacing: 0.04em;
 }
 
 .library-button {
-  background: transparent;
-  color: #cbd5e1;
-  border: 1px solid #64748b;
+  background: rgba(255, 255, 255, 0.12);
+  color: #dbeafe;
+  border: 1px solid rgba(186, 230, 253, 0.36);
   border-radius: 10px;
-  padding: 6px 10px;
+  padding: 6px 11px;
   cursor: pointer;
+  backdrop-filter: blur(8px);
 }
 
 .create-form {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 8px;
+  gap: 6px;
 }
 
 .create-form input {
-  border: 1px solid #475569;
+  border: 1px solid rgba(148, 163, 184, 0.42);
   border-radius: 10px;
-  background: #0b1220;
+  background: rgba(15, 23, 42, 0.56);
   color: #f8fafc;
   padding: 8px 10px;
 }
 
 .create-form button {
-  border: none;
+  border: 1px solid rgba(56, 189, 248, 0.55);
   border-radius: 10px;
-  background: #38bdf8;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.95), rgba(45, 212, 191, 0.86));
   color: #082f49;
   padding: 8px 12px;
   cursor: pointer;
@@ -143,23 +148,31 @@ h1 {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 8px;
+  gap: 6px;
+  align-content: start;
 }
 
 .workspace-item {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 8px;
-  border: 1px solid #334155;
-  border-radius: 10px;
-  background: #0b1220;
+  gap: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 11px;
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.5), rgba(15, 23, 42, 0.32));
   padding: 4px;
+  backdrop-filter: blur(8px);
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+
+.workspace-item:hover {
+  border-color: rgba(125, 211, 252, 0.55);
+  transform: translateX(1px);
 }
 
 .workspace-item.active {
-  border-color: #38bdf8;
-  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.25) inset;
+  border-color: rgba(56, 189, 248, 0.85);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35) inset;
 }
 
 .open-button {
@@ -178,9 +191,9 @@ h1 {
 }
 
 .delete-button {
-  border: none;
-  background: #451a1a;
-  color: #fecaca;
+  border: 1px solid rgba(248, 113, 113, 0.38);
+  background: rgba(127, 29, 29, 0.42);
+  color: #fee2e2;
   border-radius: 8px;
   padding: 6px 10px;
   cursor: pointer;
