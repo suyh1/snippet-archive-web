@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Inject,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -17,7 +18,10 @@ import { WorkspaceService } from './workspace.service'
 
 @Controller('workspaces')
 export class WorkspaceController {
-  constructor(private readonly workspaceService: WorkspaceService) {}
+  constructor(
+    @Inject(WorkspaceService)
+    private readonly workspaceService: WorkspaceService,
+  ) {}
 
   @Get()
   async listWorkspaces() {
