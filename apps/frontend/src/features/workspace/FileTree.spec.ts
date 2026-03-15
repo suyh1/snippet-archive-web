@@ -1,9 +1,29 @@
 // @vitest-environment happy-dom
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import FileTree from './FileTree.vue'
 
 describe('FileTree', () => {
+  it('creates inline draft row and emits createFile on blur', async () => {
+    const wrapper = mount(FileTree, {
+      props: {
+        files: [],
+      },
+    })
+
+    await wrapper.find('[data-testid="create-file-root"]').trigger('click')
+
+    const input = wrapper.find('[data-testid="create-inline-input"]')
+    expect(input.exists()).toBe(true)
+
+    await input.setValue('main.ts')
+    await input.trigger('blur')
+
+    expect(wrapper.emitted('createFile')).toEqual([
+      [{ parentPath: '/', name: 'main.ts' }],
+    ])
+  })
+
   it('shows guided empty state when no files exist', () => {
     const wrapper = mount(FileTree, {
       props: {
@@ -76,7 +96,7 @@ describe('FileTree', () => {
     expect(wrapper.emitted('moveFile')).toBeUndefined()
   })
 
-  it('emits select-file, rename-file and delete-file actions', async () => {
+  it('emits select-file and delete-file actions', async () => {
     const wrapper = mount(FileTree, {
       props: {
         files: [
@@ -95,12 +115,76 @@ describe('FileTree', () => {
     })
 
     await wrapper.find('.row-main').trigger('click')
-    await wrapper.find('[data-testid="rename-item"]').trigger('click')
     await wrapper.find('[data-testid="delete-item"]').trigger('click')
 
     expect(wrapper.emitted('select-file')).toEqual([['file-1']])
-    expect(wrapper.emitted('rename-file')).toEqual([['file-1']])
     expect(wrapper.emitted('delete-file')).toEqual([['file-1']])
+  })
+
+  it('renames item through inline input and emits payload on blur', async () => {
+    const wrapper = mount(FileTree, {
+      props: {
+        files: [
+          {
+            id: 'file-1',
+            workspaceId: 'w1',
+            name: 'a.ts',
+            path: '/a.ts',
+            language: 'typescript',
+            content: '',
+            kind: 'file',
+            order: 1,
+          },
+        ],
+      },
+    })
+
+    await wrapper.find('[data-testid="rename-item"]').trigger('click')
+    const input = wrapper.find('[data-testid="rename-inline-input"]')
+    expect(input.exists()).toBe(true)
+
+    await input.setValue('entry.ts')
+    await input.trigger('blur')
+
+    expect(wrapper.emitted('rename-file')).toEqual([
+      [{ fileId: 'file-1', newName: 'entry.ts' }],
+    ])
+  })
+
+  it('keeps inline rename input text while typing multiple chars', async () => {
+    const focusSpy = vi
+      .spyOn(HTMLInputElement.prototype, 'focus')
+      .mockImplementation(() => undefined)
+    const selectSpy = vi
+      .spyOn(HTMLInputElement.prototype, 'select')
+      .mockImplementation(() => undefined)
+
+    const wrapper = mount(FileTree, {
+      props: {
+        files: [
+          {
+            id: 'file-1',
+            workspaceId: 'w1',
+            name: 'a.ts',
+            path: '/a.ts',
+            language: 'typescript',
+            content: '',
+            kind: 'file',
+            order: 1,
+          },
+        ],
+      },
+    })
+
+    await wrapper.find('[data-testid="rename-item"]').trigger('click')
+    const input = wrapper.find('[data-testid="rename-inline-input"]')
+
+    await input.setValue('a')
+    await input.setValue('ab')
+
+    expect((input.element as HTMLInputElement).value).toBe('ab')
+    expect(focusSpy).toHaveBeenCalledTimes(1)
+    expect(selectSpy).toHaveBeenCalledTimes(1)
   })
 
   it('shows invalid drop feedback message for folder descendant target', async () => {

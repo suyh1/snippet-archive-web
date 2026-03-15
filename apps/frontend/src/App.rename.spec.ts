@@ -24,7 +24,7 @@ import App from './App.vue'
 import { workspaceApi } from '@/api/workspaces'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 
-describe('App rename dialog', () => {
+describe('App inline rename', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.mocked(workspaceApi.list).mockResolvedValue([])
@@ -79,22 +79,35 @@ describe('App rename dialog', () => {
     return { wrapper, store }
   }
 
-  it('shows sibling conflict validation and disables confirm', async () => {
+  it('shows sibling conflict validation and blocks submit', async () => {
     const { wrapper } = await mountWithFiles()
 
     await wrapper.findAll('[data-testid="rename-item"]')[0].trigger('click')
 
-    const input = wrapper.find('[data-testid="rename-input"]')
+    const input = wrapper.find('[data-testid="rename-inline-input"]')
     await input.setValue('utils.ts')
+    await input.trigger('blur')
 
-    expect(wrapper.text()).toContain('同级目录下已存在同名项。')
-    expect(wrapper.find('[data-testid="rename-confirm"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-testid="rename-inline-error"]').text()).toContain(
+      '同级目录下已存在同名项。',
+    )
+    expect(workspaceApi.moveFile).not.toHaveBeenCalled()
   })
 
   it('submits valid rename through move api', async () => {
     const { wrapper } = await mountWithFiles()
 
     vi.mocked(workspaceApi.moveFile).mockResolvedValue({
+      id: 'f1',
+      workspaceId: 'w1',
+      name: 'feature.ts',
+      path: '/feature.ts',
+      language: 'typescript',
+      content: '',
+      kind: 'file',
+      order: 1,
+    })
+    vi.mocked(workspaceApi.updateFile).mockResolvedValue({
       id: 'f1',
       workspaceId: 'w1',
       name: 'feature.ts',
@@ -130,15 +143,22 @@ describe('App rename dialog', () => {
 
     await wrapper.findAll('[data-testid="rename-item"]')[0].trigger('click')
 
-    const input = wrapper.find('[data-testid="rename-input"]')
+    const input = wrapper.find('[data-testid="rename-inline-input"]')
     await input.setValue('feature.ts')
-    await wrapper.find('[data-testid="rename-confirm"]').trigger('click')
+    await input.trigger('blur')
 
     await vi.waitFor(() => {
       expect(workspaceApi.moveFile).toHaveBeenCalledWith('w1', 'f1', {
         targetPath: '/feature.ts',
         targetOrder: 1,
       })
+      expect(workspaceApi.updateFile).toHaveBeenCalledWith('w1', 'f1', {
+        name: 'feature.ts',
+      })
+    })
+
+    await vi.waitFor(() => {
+      expect(wrapper.findAll('.name')[0]?.text()).toBe('feature.ts')
     })
   })
 })

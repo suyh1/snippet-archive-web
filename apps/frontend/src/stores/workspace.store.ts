@@ -368,6 +368,10 @@ export const useWorkspaceStore = defineStore('workspace', {
           targetOrder: file.order,
         })
 
+        await workspaceApi.updateFile(workspaceId, fileId, {
+          name: trimmed,
+        })
+
         await this.loadWorkspaceFiles()
       } catch (error) {
         this.errorMessage = resolveWorkspaceErrorMessage(

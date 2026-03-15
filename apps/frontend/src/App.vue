@@ -2,15 +2,11 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import CodeEditor, { type CodeEditorTheme } from '@/features/workspace/CodeEditor.vue'
-import CreateNodeDialog from '@/features/workspace/CreateNodeDialog.vue'
 import FileTree from '@/features/workspace/FileTree.vue'
-import RenameDialog from '@/features/workspace/RenameDialog.vue'
 import UnsavedChangesDialog from '@/features/workspace/UnsavedChangesDialog.vue'
 import WorkspaceSidebar from '@/features/workspace/WorkspaceSidebar.vue'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import { useWorkspaceStore } from '@/stores/workspace.store'
-import { getParentPath } from '@/utils/path'
-import { validateRenameInput } from '@/utils/rename-validation'
 
 const workspaceStore = useWorkspaceStore()
 
@@ -39,75 +35,12 @@ const {
   requestDecision,
   resolveDecision,
 } = useUnsavedGuard(dirty)
-const renameDialogOpen = ref(false)
-const renameTargetId = ref<string | null>(null)
-const renameDraftValue = ref('')
-const renameSubmitting = ref(false)
-const createDialogOpen = ref(false)
-const createNodeKind = ref<'file' | 'folder'>('file')
-const createParentPath = ref('/')
-const createDraftValue = ref('')
-const createSubmitting = ref(false)
 const editorTheme = ref<CodeEditorTheme>('glacier-night')
 const editorThemeOptions: Array<{ label: string; value: CodeEditorTheme }> = [
   { label: '冰川夜幕', value: 'glacier-night' },
   { label: '水雾暮色', value: 'aqua-dusk' },
   { label: '珍珠浅光', value: 'pearl-light' },
 ]
-
-const renameTarget = computed(() => {
-  if (!renameTargetId.value) {
-    return null
-  }
-
-  return files.value.find((item) => item.id === renameTargetId.value) ?? null
-})
-
-const renameSiblingNames = computed(() => {
-  if (!renameTarget.value) {
-    return []
-  }
-
-  const parentPath = getParentPath(renameTarget.value.path)
-  return files.value
-    .filter(
-      (item) =>
-        item.id !== renameTarget.value?.id &&
-        getParentPath(item.path) === parentPath,
-    )
-    .map((item) => item.name)
-})
-
-const renameErrorMessage = computed(() => {
-  if (!renameDialogOpen.value) {
-    return null
-  }
-
-  return validateRenameInput(renameDraftValue.value, renameSiblingNames.value)
-})
-
-const renameConfirmDisabled = computed(() => {
-  return !renameTarget.value || !!renameErrorMessage.value || renameSubmitting.value
-})
-
-const createSiblingNames = computed(() => {
-  const parentPath = createParentPath.value
-  return files.value
-    .filter((item) => getParentPath(item.path) === parentPath)
-    .map((item) => item.name)
-})
-
-const createErrorMessage = computed(() => {
-  if (!createDialogOpen.value) {
-    return null
-  }
-
-  return validateRenameInput(createDraftValue.value, createSiblingNames.value)
-})
-
-const createConfirmDisabled = computed(() => {
-  return createSubmitting.value || !!createErrorMessage.value
-})
 
 onMounted(async () => {
   const storedTheme = window.localStorage.getItem('editor-theme')
@@ -191,12 +124,12 @@ function backToLibrary() {
   })
 }
 
-function createFile(parentPath: string) {
-  openCreateDialog(parentPath, 'file')
+function createFile(payload: { parentPath: string; name: string }) {
+  void workspaceStore.createFile(payload.parentPath, payload.name)
 }
 
-function createFolder(parentPath: string) {
-  openCreateDialog(parentPath, 'folder')
+function createFolder(payload: { parentPath: string; name: string }) {
+  void workspaceStore.createFolder(payload.parentPath, payload.name)
 }
 
 function moveFile(payload: { fileId: string; targetParentPath: string }) {
@@ -213,46 +146,8 @@ function selectFile(fileId: string) {
   })
 }
 
-function openRenameDialog(fileId: string) {
-  const target = files.value.find((item) => item.id === fileId)
-  if (!target) {
-    return
-  }
-
-  renameTargetId.value = fileId
-  renameDraftValue.value = target.name
-  renameDialogOpen.value = true
-}
-
-function closeRenameDialog() {
-  renameDialogOpen.value = false
-  renameTargetId.value = null
-  renameDraftValue.value = ''
-  renameSubmitting.value = false
-}
-
-async function confirmRename() {
-  if (!renameTarget.value) {
-    return
-  }
-
-  const nextName = renameDraftValue.value
-  if (nextName === renameTarget.value.name) {
-    closeRenameDialog()
-    return
-  }
-
-  if (validateRenameInput(nextName, renameSiblingNames.value)) {
-    return
-  }
-
-  renameSubmitting.value = true
-  await workspaceStore.renameFile(renameTarget.value.id, nextName)
-  renameSubmitting.value = false
-
-  if (!workspaceStore.errorMessage) {
-    closeRenameDialog()
-  }
+function renameFile(payload: { fileId: string; newName: string }) {
+  void workspaceStore.renameFile(payload.fileId, payload.newName)
 }
 
 function deleteFile(fileId: string) {
@@ -268,38 +163,6 @@ function deleteFile(fileId: string) {
 
 function saveFile() {
   void workspaceStore.saveCurrentFile()
-}
-
-function openCreateDialog(parentPath: string, kind: 'file' | 'folder') {
-  createDialogOpen.value = true
-  createNodeKind.value = kind
-  createParentPath.value = parentPath
-  createDraftValue.value = kind === 'file' ? 'main.ts' : 'new-folder'
-}
-
-function closeCreateDialog() {
-  createDialogOpen.value = false
-  createSubmitting.value = false
-  createParentPath.value = '/'
-  createDraftValue.value = ''
-}
-
-async function confirmCreateNode() {
-  if (validateRenameInput(createDraftValue.value, createSiblingNames.value)) {
-    return
-  }
-
-  createSubmitting.value = true
-  if (createNodeKind.value === 'file') {
-    await workspaceStore.createFile(createParentPath.value, createDraftValue.value)
-  } else {
-    await workspaceStore.createFolder(createParentPath.value, createDraftValue.value)
-  }
-
-  createSubmitting.value = false
-  if (!workspaceStore.errorMessage) {
-    closeCreateDialog()
-  }
 }
 </script>
 
@@ -382,7 +245,7 @@ async function confirmCreateNode() {
             @create-folder="createFolder"
             @move-file="moveFile"
             @select-file="selectFile"
-            @rename-file="openRenameDialog"
+            @rename-file="renameFile"
             @delete-file="deleteFile"
           />
 
@@ -442,30 +305,6 @@ async function confirmCreateNode() {
       @save="resolveUnsavedChoice('save')"
       @discard="resolveUnsavedChoice('discard')"
       @cancel="resolveUnsavedChoice('cancel')"
-    />
-
-    <RenameDialog
-      :open="renameDialogOpen"
-      :value="renameDraftValue"
-      :error-message="renameErrorMessage"
-      :submitting="renameSubmitting"
-      :confirm-disabled="renameConfirmDisabled"
-      @update:value="renameDraftValue = $event"
-      @confirm="confirmRename"
-      @cancel="closeRenameDialog"
-    />
-
-    <CreateNodeDialog
-      :open="createDialogOpen"
-      :kind="createNodeKind"
-      :value="createDraftValue"
-      :parent-path="createParentPath"
-      :error-message="createErrorMessage"
-      :submitting="createSubmitting"
-      :confirm-disabled="createConfirmDisabled"
-      @update:value="createDraftValue = $event"
-      @confirm="confirmCreateNode"
-      @cancel="closeCreateDialog"
     />
   </main>
 </template>

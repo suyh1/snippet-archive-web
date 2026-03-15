@@ -142,6 +142,11 @@ describe('workspace store', () => {
       name: 'entry.ts',
       path: '/src/entry.ts',
     })
+    vi.mocked(workspaceApi.updateFile).mockResolvedValue({
+      ...store.files[0],
+      name: 'entry.ts',
+      path: '/src/entry.ts',
+    })
     vi.mocked(workspaceApi.listFiles).mockResolvedValue([
       {
         ...store.files[0],
@@ -155,6 +160,9 @@ describe('workspace store', () => {
     expect(workspaceApi.moveFile).toHaveBeenCalledWith('w1', 'f1', {
       targetPath: '/src/entry.ts',
       targetOrder: 1,
+    })
+    expect(workspaceApi.updateFile).toHaveBeenCalledWith('w1', 'f1', {
+      name: 'entry.ts',
     })
   })
 

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import type { WorkspaceFile } from '@/types/workspace'
-import { getParentPath, normalizePath } from '@/utils/path'
+import { getParentPath, joinPath, normalizePath } from '@/utils/path'
+import { validateRenameInput } from '@/utils/rename-validation'
 
 type TreeRow = {
   id: string
@@ -10,6 +11,20 @@ type TreeRow = {
   path: string
   order: number
   depth: number
+  draft?: boolean
+}
+
+type CreateDraft = {
+  kind: 'file' | 'folder'
+  parentPath: string
+  name: string
+}
+
+type RenameDraft = {
+  fileId: string
+  parentPath: string
+  originalName: string
+  name: string
 }
 
 const props = defineProps<{
@@ -19,11 +34,11 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  createFile: [parentPath: string]
-  createFolder: [parentPath: string]
+  createFile: [payload: { parentPath: string; name: string }]
+  createFolder: [payload: { parentPath: string; name: string }]
   moveFile: [payload: { fileId: string; targetParentPath: string }]
   'select-file': [fileId: string]
-  'rename-file': [fileId: string]
+  'rename-file': [payload: { fileId: string; newName: string }]
   'delete-file': [fileId: string]
 }>()
 
@@ -32,7 +47,16 @@ const hoverTargetPath = ref<string | null>(null)
 const invalidTargetPath = ref<string | null>(null)
 const dropMessage = ref('')
 
-const rows = computed<TreeRow[]>(() => {
+const createDraft = ref<CreateDraft | null>(null)
+const renameDraft = ref<RenameDraft | null>(null)
+
+const createInputRef = ref<HTMLInputElement | HTMLInputElement[] | null>(null)
+const renameInputRef = ref<HTMLInputElement | HTMLInputElement[] | null>(null)
+
+const createValidationMessage = ref<string | null>(null)
+const renameValidationMessage = ref<string | null>(null)
+
+const baseRows = computed<TreeRow[]>(() => {
   const sorted = [...props.files].sort((a, b) => {
     const depthA = normalizePath(a.path).split('/').filter(Boolean).length
     const depthB = normalizePath(b.path).split('/').filter(Boolean).length
@@ -58,12 +82,296 @@ const rows = computed<TreeRow[]>(() => {
   }))
 })
 
-function createFileAt(parentPath: string) {
-  emit('createFile', parentPath)
+const rows = computed<TreeRow[]>(() => {
+  const mapped = [...baseRows.value]
+
+  if (!createDraft.value) {
+    return mapped
+  }
+
+  const parentPath = normalizePath(createDraft.value.parentPath)
+  const draftDepth = parentPath === '/' ? 0 : parentPath.split('/').filter(Boolean).length
+  const previewPath = joinPath(parentPath, createDraft.value.name || 'new-item')
+
+  const draftRow: TreeRow = {
+    id: '__create_draft__',
+    name: createDraft.value.name,
+    kind: createDraft.value.kind,
+    path: previewPath,
+    order: Number.MAX_SAFE_INTEGER,
+    depth: draftDepth,
+    draft: true,
+  }
+
+  if (parentPath === '/') {
+    mapped.unshift(draftRow)
+    return mapped
+  }
+
+  const normalizedParent = normalizePath(parentPath)
+  const descendantPrefix = `${normalizedParent}/`
+  const parentIndex = mapped.findIndex((row) => normalizePath(row.path) === normalizedParent)
+
+  if (parentIndex === -1) {
+    mapped.push(draftRow)
+    return mapped
+  }
+
+  let insertAt = parentIndex + 1
+  while (
+    insertAt < mapped.length &&
+    normalizePath(mapped[insertAt].path).startsWith(descendantPrefix)
+  ) {
+    insertAt += 1
+  }
+
+  mapped.splice(insertAt, 0, draftRow)
+  return mapped
+})
+
+function getCreateInputElement() {
+  const input = createInputRef.value
+  if (Array.isArray(input)) {
+    return input[0] ?? null
+  }
+
+  return input
 }
 
-function createFolderAt(parentPath: string) {
-  emit('createFolder', parentPath)
+function getRenameInputElement() {
+  const input = renameInputRef.value
+  if (Array.isArray(input)) {
+    return input[0] ?? null
+  }
+
+  return input
+}
+
+watch(
+  () => createDraft.value,
+  async (draft) => {
+    if (!draft) {
+      return
+    }
+
+    await nextTick()
+    const input = getCreateInputElement()
+    if (input && typeof input.focus === 'function') {
+      input.focus()
+    }
+    if (input && typeof input.select === 'function') {
+      input.select()
+    }
+  },
+)
+
+watch(
+  () => renameDraft.value,
+  async (draft) => {
+    if (!draft) {
+      return
+    }
+
+    await nextTick()
+    const input = getRenameInputElement()
+    if (input && typeof input.focus === 'function') {
+      input.focus()
+    }
+    if (input && typeof input.select === 'function') {
+      input.select()
+    }
+  },
+)
+
+function beginCreate(kind: 'file' | 'folder', parentPath: string) {
+  cancelRenameDraft()
+
+  createDraft.value = {
+    kind,
+    parentPath: normalizePath(parentPath),
+    name: kind === 'file' ? 'main.ts' : 'new-folder',
+  }
+  createValidationMessage.value = null
+}
+
+function getCreateSiblingNames() {
+  if (!createDraft.value) {
+    return []
+  }
+
+  const parentPath = normalizePath(createDraft.value.parentPath)
+  return props.files
+    .filter((item) => getParentPath(item.path) === parentPath)
+    .map((item) => item.name)
+}
+
+function validateCreateDraftName() {
+  if (!createDraft.value) {
+    return null
+  }
+
+  const message = validateRenameInput(createDraft.value.name, getCreateSiblingNames())
+  createValidationMessage.value = message
+  return message
+}
+
+function cancelCreateDraft() {
+  createDraft.value = null
+  createValidationMessage.value = null
+}
+
+function submitCreateDraft() {
+  if (!createDraft.value) {
+    return
+  }
+
+  const message = validateCreateDraftName()
+  if (message) {
+    nextTick(() => {
+      const input = getCreateInputElement()
+      if (input && typeof input.focus === 'function') {
+        input.focus()
+      }
+      if (input && typeof input.select === 'function') {
+        input.select()
+      }
+    })
+    return
+  }
+
+  const payload = {
+    parentPath: createDraft.value.parentPath,
+    name: createDraft.value.name.trim(),
+  }
+
+  const kind = createDraft.value.kind
+  cancelCreateDraft()
+
+  if (kind === 'file') {
+    emit('createFile', payload)
+    return
+  }
+
+  emit('createFolder', payload)
+}
+
+function updateCreateDraftName(value: string) {
+  if (!createDraft.value) {
+    return
+  }
+
+  createDraft.value.name = value
+  validateCreateDraftName()
+}
+
+function onCreateDraftBlur() {
+  submitCreateDraft()
+}
+
+function onCreateDraftEnter(event: KeyboardEvent) {
+  event.preventDefault()
+  submitCreateDraft()
+}
+
+function onCreateDraftEscape(event: KeyboardEvent) {
+  event.preventDefault()
+  cancelCreateDraft()
+}
+
+function beginRename(row: TreeRow) {
+  cancelCreateDraft()
+
+  renameDraft.value = {
+    fileId: row.id,
+    parentPath: getParentPath(row.path),
+    originalName: row.name,
+    name: row.name,
+  }
+  renameValidationMessage.value = null
+}
+
+function getRenameSiblingNames() {
+  if (!renameDraft.value) {
+    return []
+  }
+
+  return props.files
+    .filter(
+      (item) =>
+        item.id !== renameDraft.value?.fileId &&
+        getParentPath(item.path) === renameDraft.value?.parentPath,
+    )
+    .map((item) => item.name)
+}
+
+function validateRenameDraftName() {
+  if (!renameDraft.value) {
+    return null
+  }
+
+  const message = validateRenameInput(renameDraft.value.name, getRenameSiblingNames())
+  renameValidationMessage.value = message
+  return message
+}
+
+function cancelRenameDraft() {
+  renameDraft.value = null
+  renameValidationMessage.value = null
+}
+
+function submitRenameDraft() {
+  if (!renameDraft.value) {
+    return
+  }
+
+  const nextName = renameDraft.value.name
+  if (nextName === renameDraft.value.originalName) {
+    cancelRenameDraft()
+    return
+  }
+
+  const message = validateRenameDraftName()
+  if (message) {
+    nextTick(() => {
+      const input = getRenameInputElement()
+      if (input && typeof input.focus === 'function') {
+        input.focus()
+      }
+      if (input && typeof input.select === 'function') {
+        input.select()
+      }
+    })
+    return
+  }
+
+  emit('rename-file', {
+    fileId: renameDraft.value.fileId,
+    newName: renameDraft.value.name.trim(),
+  })
+  cancelRenameDraft()
+}
+
+function updateRenameDraftName(value: string) {
+  if (!renameDraft.value) {
+    return
+  }
+
+  renameDraft.value.name = value
+  validateRenameDraftName()
+}
+
+function onRenameDraftBlur() {
+  submitRenameDraft()
+}
+
+function onRenameDraftEnter(event: KeyboardEvent) {
+  event.preventDefault()
+  submitRenameDraft()
+}
+
+function onRenameDraftEscape(event: KeyboardEvent) {
+  event.preventDefault()
+  cancelRenameDraft()
 }
 
 function dragStart(fileId: string) {
@@ -95,7 +403,7 @@ function handleDropTarget(targetParentPath: string) {
     return
   }
 
-  const draggingRow = rows.value.find((row) => row.id === draggingId.value)
+  const draggingRow = baseRows.value.find((row) => row.id === draggingId.value)
   if (!draggingRow) {
     draggingId.value = null
     return
@@ -127,7 +435,7 @@ function handleDragOverTarget(targetParentPath: string) {
     return
   }
 
-  const draggingRow = rows.value.find((row) => row.id === draggingId.value)
+  const draggingRow = baseRows.value.find((row) => row.id === draggingId.value)
   if (!draggingRow) {
     return
   }
@@ -148,6 +456,10 @@ function handleDragOverTarget(targetParentPath: string) {
 }
 
 function dropOnRow(row: TreeRow) {
+  if (row.draft || renameDraft.value?.fileId === row.id) {
+    return
+  }
+
   if (row.kind === 'folder') {
     handleDropTarget(row.path)
     return
@@ -157,6 +469,10 @@ function dropOnRow(row: TreeRow) {
 }
 
 function dragOverRow(row: TreeRow) {
+  if (row.draft || renameDraft.value?.fileId === row.id) {
+    return
+  }
+
   if (row.kind === 'folder') {
     handleDragOverTarget(row.path)
     return
@@ -169,10 +485,6 @@ function selectFile(fileId: string) {
   emit('select-file', fileId)
 }
 
-function renameFile(fileId: string) {
-  emit('rename-file', fileId)
-}
-
 function deleteFile(fileId: string) {
   emit('delete-file', fileId)
 }
@@ -183,10 +495,10 @@ function deleteFile(fileId: string) {
     <header class="tree-header">
       <h3>Files</h3>
       <div class="tree-actions">
-        <button type="button" data-testid="create-file-root" @click="createFileAt('/')">
+        <button type="button" data-testid="create-file-root" @click="beginCreate('file', '/')">
           新建文件
         </button>
-        <button type="button" data-testid="create-folder-root" @click="createFolderAt('/')">
+        <button type="button" data-testid="create-folder-root" @click="beginCreate('folder', '/')">
           新建文件夹
         </button>
       </div>
@@ -214,60 +526,127 @@ function deleteFile(fileId: string) {
         :class="[
           'row',
           { active: row.id === props.activeFileId },
-          { 'drop-active': hoverTargetPath === (row.kind === 'folder' ? row.path : getParentPath(row.path)) },
-          { 'drop-invalid': invalidTargetPath === (row.kind === 'folder' ? row.path : getParentPath(row.path)) },
+          { draft: row.draft },
+          { 'rename-draft': renameDraft?.fileId === row.id },
+          { 'drop-active': !row.draft && renameDraft?.fileId !== row.id && hoverTargetPath === (row.kind === 'folder' ? row.path : getParentPath(row.path)) },
+          { 'drop-invalid': !row.draft && renameDraft?.fileId !== row.id && invalidTargetPath === (row.kind === 'folder' ? row.path : getParentPath(row.path)) },
         ]"
-        :draggable="true"
+        :draggable="!row.draft && renameDraft?.fileId !== row.id"
         @dragstart="dragStart(row.id)"
         @dragend="dragEnd"
         @dragover.prevent="dragOverRow(row)"
         @drop.prevent="dropOnRow(row)"
       >
-        <button
-          type="button"
-          class="row-main"
-          :style="{ paddingLeft: `${row.depth * 16 + 8}px` }"
-          @click="selectFile(row.id)"
-        >
-          <span class="kind">{{ row.kind === 'folder' ? '📁' : '📄' }}</span>
-          <span class="name">{{ row.name }}</span>
-          <span class="meta">{{ row.path }}</span>
-        </button>
+        <template v-if="row.draft">
+          <div class="row-main draft-main" :style="{ paddingLeft: `${row.depth * 16 + 8}px` }">
+            <span class="kind">{{ row.kind === 'folder' ? '📁' : '📄' }}</span>
+            <input
+              ref="createInputRef"
+              data-testid="create-inline-input"
+              class="draft-input"
+              :value="createDraft?.name ?? ''"
+              @input="updateCreateDraftName(($event.target as HTMLInputElement).value)"
+              @blur="onCreateDraftBlur"
+              @keydown.enter="onCreateDraftEnter"
+              @keydown.esc="onCreateDraftEscape"
+            >
+            <span class="meta">{{ row.path }}</span>
+          </div>
 
-        <div class="row-actions">
+          <div class="row-actions">
+            <button
+              type="button"
+              class="cancel-button"
+              @mousedown.prevent
+              @click="cancelCreateDraft"
+            >
+              取消
+            </button>
+          </div>
+        </template>
+
+        <template v-else-if="renameDraft?.fileId === row.id">
+          <div class="row-main draft-main" :style="{ paddingLeft: `${row.depth * 16 + 8}px` }">
+            <span class="kind">{{ row.kind === 'folder' ? '📁' : '📄' }}</span>
+            <input
+              ref="renameInputRef"
+              data-testid="rename-inline-input"
+              class="draft-input"
+              :value="renameDraft.name"
+              @input="updateRenameDraftName(($event.target as HTMLInputElement).value)"
+              @blur="onRenameDraftBlur"
+              @keydown.enter="onRenameDraftEnter"
+              @keydown.esc="onRenameDraftEscape"
+            >
+            <span class="meta">{{ joinPath(renameDraft.parentPath, renameDraft.name || renameDraft.originalName) }}</span>
+          </div>
+
+          <div class="row-actions">
+            <button
+              type="button"
+              class="cancel-button"
+              @mousedown.prevent
+              @click="cancelRenameDraft"
+            >
+              取消
+            </button>
+          </div>
+        </template>
+
+        <template v-else>
           <button
-            v-if="row.kind === 'folder'"
             type="button"
-            @click="createFileAt(row.path)"
+            class="row-main"
+            :style="{ paddingLeft: `${row.depth * 16 + 8}px` }"
+            @click="selectFile(row.id)"
           >
-            +文件
+            <span class="kind">{{ row.kind === 'folder' ? '📁' : '📄' }}</span>
+            <span class="name">{{ row.name }}</span>
+            <span class="meta">{{ row.path }}</span>
           </button>
-          <button
-            v-if="row.kind === 'folder'"
-            type="button"
-            @click="createFolderAt(row.path)"
-          >
-            +文件夹
-          </button>
-          <button
-            type="button"
-            data-testid="rename-item"
-            @click="renameFile(row.id)"
-          >
-            重命名
-          </button>
-          <button
-            type="button"
-            data-testid="delete-item"
-            @click="deleteFile(row.id)"
-          >
-            删除
-          </button>
-        </div>
+
+          <div class="row-actions">
+            <button
+              v-if="row.kind === 'folder'"
+              type="button"
+              @click="beginCreate('file', row.path)"
+            >
+              +文件
+            </button>
+            <button
+              v-if="row.kind === 'folder'"
+              type="button"
+              @click="beginCreate('folder', row.path)"
+            >
+              +文件夹
+            </button>
+            <button
+              type="button"
+              data-testid="rename-item"
+              @click="beginRename(row)"
+            >
+              重命名
+            </button>
+            <button
+              type="button"
+              data-testid="delete-item"
+              @click="deleteFile(row.id)"
+            >
+              删除
+            </button>
+          </div>
+        </template>
       </li>
     </ul>
 
-    <p v-else class="hint">当前工作区还没有文件，点击「新建文件」开始。</p>
+    <div v-if="createValidationMessage" class="create-error" data-testid="create-inline-error">
+      {{ createValidationMessage }}
+    </div>
+    <div v-if="renameValidationMessage" class="create-error" data-testid="rename-inline-error">
+      {{ renameValidationMessage }}
+    </div>
+
+    <p v-if="!loading && rows.length === 0" class="hint">当前工作区还没有文件，点击「新建文件」开始。</p>
   </section>
 </template>
 
@@ -358,6 +737,14 @@ function deleteFile(fileId: string) {
   background: rgba(186, 230, 253, 0.55);
 }
 
+.row.draft {
+  background: rgba(240, 249, 255, 0.82);
+}
+
+.row.rename-draft {
+  background: rgba(236, 254, 255, 0.85);
+}
+
 .row.drop-active {
   background: rgba(191, 219, 254, 0.56);
 }
@@ -375,6 +762,21 @@ function deleteFile(fileId: string) {
   background: transparent;
   cursor: pointer;
   text-align: left;
+}
+
+.row-main.draft-main {
+  cursor: text;
+}
+
+.draft-input {
+  flex: 1;
+  min-width: 120px;
+  border: 1px solid rgba(14, 165, 233, 0.45);
+  border-radius: 8px;
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #0f172a;
+  font-size: 13px;
 }
 
 .kind {
@@ -407,6 +809,18 @@ function deleteFile(fileId: string) {
   border-radius: 8px;
   padding: 4px 8px;
   cursor: pointer;
+}
+
+.row-actions .cancel-button {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(254, 226, 226, 0.8);
+  color: #7f1d1d;
+}
+
+.create-error {
+  margin: 0 10px 8px;
+  color: #b91c1c;
+  font-size: 12px;
 }
 
 .hint {

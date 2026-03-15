@@ -24,13 +24,13 @@ import App from './App.vue'
 import { workspaceApi } from '@/api/workspaces'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 
-describe('App create node dialog', () => {
+describe('App inline create node', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.mocked(workspaceApi.list).mockResolvedValue([])
   })
 
-  it('creates file through custom dialog flow', async () => {
+  it('creates file through inline row flow', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
 
@@ -79,10 +79,10 @@ describe('App create node dialog', () => {
     await nextTick()
 
     await wrapper.find('[data-testid="create-file-root"]').trigger('click')
-    expect(wrapper.find('[data-testid="create-node-dialog"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="create-inline-input"]').exists()).toBe(true)
 
-    await wrapper.find('[data-testid="create-node-input"]').setValue('main.ts')
-    await wrapper.find('[data-testid="create-node-confirm"]').trigger('click')
+    await wrapper.find('[data-testid="create-inline-input"]').setValue('main.ts')
+    await wrapper.find('[data-testid="create-inline-input"]').trigger('blur')
 
     await vi.waitFor(() => {
       expect(workspaceApi.createFile).toHaveBeenCalled()
