@@ -1,14 +1,20 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import CodeEditor, { type CodeEditorTheme } from '@/features/workspace/CodeEditor.vue'
+import CodeEditor, {
+  type CodeEditorTheme,
+  type EditorStatusPayload,
+} from '@/features/workspace/CodeEditor.vue'
 import ConfirmDialog from '@/features/workspace/ConfirmDialog.vue'
 import FileTree from '@/features/workspace/FileTree.vue'
+import SnapshotDialog from '@/features/workspace/SnapshotDialog.vue'
 import UnsavedChangesDialog from '@/features/workspace/UnsavedChangesDialog.vue'
 import WorkspaceSidebar from '@/features/workspace/WorkspaceSidebar.vue'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import { useWorkspaceStore } from '@/stores/workspace.store'
-import type { WorkspaceFile } from '@/types/workspace'
+import type { EditorSnapshot, WorkspaceFile } from '@/types/workspace'
+import { formatSnippetContent } from '@/utils/formatter'
+import { normalizeLanguage } from '@/utils/language-detect'
 
 const workspaceStore = useWorkspaceStore()
 
@@ -24,6 +30,7 @@ const {
   libraryMode,
   errorMessage,
   draftContent,
+  draftLanguage,
   dirty,
 } = storeToRefs(workspaceStore)
 
@@ -32,6 +39,9 @@ const canSave = computed(() => {
 })
 const canUseEditorTools = computed(() => {
   return !!activeFile.value && activeFile.value.kind === 'file' && !saving.value
+})
+const canFormat = computed(() => {
+  return canUseEditorTools.value && !formatting.value
 })
 
 const resolvingUnsavedSave = ref(false)
@@ -60,6 +70,17 @@ const historyAvailability = ref({
   canUndo: false,
   canRedo: false,
 })
+const snapshotDialogOpen = ref(false)
+const snapshotRestoring = ref(false)
+const snapshotItems = ref<EditorSnapshot[]>([])
+const formatting = ref(false)
+const editorStatus = ref<EditorStatusPayload>({
+  lineCount: 1,
+  cursorLine: 1,
+  cursorColumn: 1,
+  eol: 'LF',
+})
+const STATUS_ENCODING = 'UTF-8'
 const {
   dialogOpen: unsavedDialogOpen,
   requestDecision,
@@ -71,6 +92,21 @@ const editorThemeOptions: Array<{ label: string; value: CodeEditorTheme }> = [
   { label: '水雾暮色', value: 'aqua-dusk' },
   { label: '珍珠浅光', value: 'pearl-light' },
 ]
+const languageLabelMap: Record<string, string> = {
+  plaintext: 'Plain Text',
+  typescript: 'TypeScript',
+  javascript: 'JavaScript',
+  json: 'JSON',
+  markdown: 'Markdown',
+  html: 'HTML',
+  vue: 'Vue',
+}
+const statusLanguageLabel = computed(() => {
+  const language = normalizeLanguage(
+    draftLanguage.value || activeFile.value?.language || 'plaintext',
+  )
+  return languageLabelMap[language] ?? language
+})
 
 onMounted(async () => {
   const storedTheme = window.localStorage.getItem('editor-theme')
@@ -240,6 +276,75 @@ function updateHistoryAvailability(payload: { canUndo: boolean; canRedo: boolean
   historyAvailability.value = payload
 }
 
+async function formatEditorContent() {
+  if (!activeFile.value || activeFile.value.kind !== 'file' || !canFormat.value) {
+    return
+  }
+
+  formatting.value = true
+  const result = await formatSnippetContent({
+    language: draftLanguage.value,
+    content: draftContent.value,
+  })
+
+  if (!result.ok) {
+    workspaceStore.errorMessage =
+      result.reason === 'unsupported'
+        ? '当前语言暂不支持格式化。'
+        : result.errorMessage ?? '格式化失败，请稍后重试。'
+    formatting.value = false
+    return
+  }
+
+  if (result.content !== draftContent.value) {
+    workspaceStore.createSnapshotForActiveFile('format')
+    workspaceStore.setDraftContent(result.content)
+    if (snapshotDialogOpen.value) {
+      snapshotItems.value = workspaceStore.getActiveFileSnapshots()
+    }
+  }
+
+  formatting.value = false
+}
+
+function openSnapshotDialog() {
+  snapshotItems.value = workspaceStore.getActiveFileSnapshots()
+  snapshotDialogOpen.value = true
+}
+
+function closeSnapshotDialog() {
+  if (snapshotRestoring.value) {
+    return
+  }
+
+  snapshotDialogOpen.value = false
+}
+
+function createManualSnapshot() {
+  workspaceStore.createSnapshotForActiveFile('manual')
+  snapshotItems.value = workspaceStore.getActiveFileSnapshots()
+}
+
+function restoreSnapshot(snapshotId: string) {
+  snapshotRestoring.value = true
+  const restored = workspaceStore.restoreSnapshotForActiveFile(snapshotId)
+  snapshotRestoring.value = false
+  if (!restored) {
+    return
+  }
+
+  snapshotItems.value = workspaceStore.getActiveFileSnapshots()
+  snapshotDialogOpen.value = false
+}
+
+function updateEditorStatus(payload: EditorStatusPayload) {
+  editorStatus.value = payload
+}
+
+function applyDetectedLanguage(language: string) {
+  workspaceStore.setDraftLanguage(language)
+}
+
 function clearDeletedFileToastTimer() {
   if (deletedFileToastTimer !== null) {
     window.clearTimeout(deletedFileToastTimer)
@@ -338,9 +443,10 @@ watch(
     () => activeFile.value?.id,
     () => activeFile.value?.kind,
     () => draftContent.value,
+    () => draftLanguage.value,
     () => saving.value,
   ],
-  ([isDirty, activeId, activeKind, _draft, isSaving]) => {
+  ([isDirty, activeId, activeKind, _draft, _draftLanguage, isSaving]) => {
     if (!isDirty || !activeId || activeKind !== 'file' || isSaving) {
       clearAutoSaveTimer()
       return
@@ -357,6 +463,14 @@ watch(
   () => activeFile.value?.id,
   () => {
     historyAvailability.value = { canUndo: false, canRedo: false }
+    snapshotDialogOpen.value = false
+    snapshotItems.value = []
+    editorStatus.value = {
+      lineCount: 1,
+      cursorLine: 1,
+      cursorColumn: 1,
+      eol: 'LF',
+    }
   },
 )
 
@@ -496,6 +610,24 @@ onBeforeUnmount(() => {
                   >
                     替换
                   </button>
+                  <button
+                    type="button"
+                    class="editor-tool-button"
+                    data-testid="editor-format"
+                    :disabled="!canFormat"
+                    @click="formatEditorContent"
+                  >
+                    {{ formatting ? '格式化中...' : '格式化' }}
+                  </button>
+                  <button
+                    type="button"
+                    class="editor-tool-button"
+                    data-testid="editor-snapshots"
+                    :disabled="!canUseEditorTools"
+                    @click="openSnapshotDialog"
+                  >
+                    快照
+                  </button>
                 </div>
                 <label class="theme-picker">
                   <span>主题</span>
@@ -524,13 +656,29 @@ onBeforeUnmount(() => {
               v-if="activeFile"
               ref="codeEditorRef"
               :model-value="draftContent"
-              :language="activeFile.language"
+              :language="draftLanguage"
               :readonly="saving"
               :theme="editorTheme"
               @update:model-value="workspaceStore.setDraftContent"
               @save-shortcut="saveFile"
               @history-availability="updateHistoryAvailability"
+              @status-change="updateEditorStatus"
+              @language-detected="applyDetectedLanguage"
             />
+
+            <footer
+              v-if="activeFile"
+              class="editor-statusbar"
+              data-testid="editor-statusbar"
+            >
+              <span data-testid="editor-status-language">语言: {{ statusLanguageLabel }}</span>
+              <span data-testid="editor-status-lines">{{ editorStatus.lineCount }} 行</span>
+              <span data-testid="editor-status-cursor">
+                Ln {{ editorStatus.cursorLine }}, Col {{ editorStatus.cursorColumn }}
+              </span>
+              <span data-testid="editor-status-encoding">{{ STATUS_ENCODING }}</span>
+              <span data-testid="editor-status-eol">{{ editorStatus.eol }}</span>
+            </footer>
 
             <p v-else class="editor-empty">
               先在左侧创建或选择文件，然后开始编辑。
@@ -567,6 +715,16 @@ onBeforeUnmount(() => {
       danger
       @confirm="confirmDelete"
       @cancel="cancelDeleteConfirm"
+    />
+
+    <SnapshotDialog
+      :open="snapshotDialogOpen"
+      :file-name="activeFile?.name ?? ''"
+      :snapshots="snapshotItems"
+      :restoring="snapshotRestoring"
+      @close="closeSnapshotDialog"
+      @create="createManualSnapshot"
+      @restore="restoreSnapshot"
     />
 
     <UnsavedChangesDialog
@@ -764,7 +922,7 @@ h2 {
   backdrop-filter: blur(12px);
   box-shadow: 0 16px 32px rgba(15, 23, 42, 0.1);
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   min-height: 0;
   height: 100%;
 }
@@ -866,6 +1024,19 @@ h2 {
   color: #334155;
   font-size: 14px;
   padding: 16px;
+}
+
+.editor-statusbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 7px 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(248, 250, 252, 0.66);
+  font-size: 12px;
+  color: #334155;
+  white-space: nowrap;
+  overflow: auto;
 }
 
 .undo-toast {

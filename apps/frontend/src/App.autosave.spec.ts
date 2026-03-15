@@ -73,6 +73,7 @@ describe('App auto-save', () => {
 
     expect(workspaceApi.updateFile).toHaveBeenCalledWith('w1', 'f1', {
       content: 'const a = 2',
+      language: 'typescript',
     })
   })
 })

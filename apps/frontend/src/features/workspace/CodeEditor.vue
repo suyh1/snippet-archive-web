@@ -17,8 +17,15 @@ import { json } from '@codemirror/lang-json'
 import { markdown } from '@codemirror/lang-markdown'
 import { html } from '@codemirror/lang-html'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { detectLanguageFromSnippet, normalizeLanguage } from '@/utils/language-detect'
 
 export type CodeEditorTheme = 'glacier-night' | 'aqua-dusk' | 'pearl-light'
+export type EditorStatusPayload = {
+  lineCount: number
+  cursorLine: number
+  cursorColumn: number
+  eol: 'LF' | 'CRLF'
+}
 
 const props = withDefaults(
   defineProps<{
@@ -38,6 +45,8 @@ const emit = defineEmits<{
   'update:modelValue': [value: string]
   'save-shortcut': []
   'history-availability': [payload: { canUndo: boolean; canRedo: boolean }]
+  'status-change': [payload: EditorStatusPayload]
+  'language-detected': [language: string]
 }>()
 
 const editorRef = ref<HTMLElement | null>(null)
@@ -55,6 +64,33 @@ function emitHistoryAvailability() {
   emit('history-availability', {
     canUndo: undoDepth(view.state) > 0,
     canRedo: redoDepth(view.state) > 0,
+  })
+}
+
+function resolveEol(text: string): 'LF' | 'CRLF' {
+  return text.includes('\r\n') ? 'CRLF' : 'LF'
+}
+
+function emitEditorStatus() {
+  if (!view) {
+    emit('status-change', {
+      lineCount: 1,
+      cursorLine: 1,
+      cursorColumn: 1,
+      eol: 'LF',
+    })
+    return
+  }
+
+  const content = view.state.doc.toString()
+  const cursorHead = view.state.selection.main.head
+  const currentLine = view.state.doc.lineAt(cursorHead)
+
+  emit('status-change', {
+    lineCount: view.state.doc.lines,
+    cursorLine: currentLine.number,
+    cursorColumn: cursorHead - currentLine.from + 1,
+    eol: resolveEol(content),
   })
 }
 
@@ -133,7 +169,7 @@ function resolveLanguageExtension(language: string) {
     return markdown()
   }
 
-  if (language === 'vue') {
+  if (language === 'vue' || language === 'html') {
     return html()
   }
 
@@ -266,11 +302,29 @@ onMounted(() => {
             },
           },
         ]),
+        EditorView.domEventHandlers({
+          paste: (event) => {
+            const clipboardEvent = event as ClipboardEvent
+            const clipboardText = clipboardEvent.clipboardData?.getData('text/plain') ?? ''
+            const detectedLanguage = detectLanguageFromSnippet(clipboardText)
+            if (!detectedLanguage) {
+              return false
+            }
+
+            const currentLanguage = normalizeLanguage(props.language)
+            if (detectedLanguage !== currentLanguage) {
+              emit('language-detected', detectedLanguage)
+            }
+
+            return false
+          },
+        }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             emit('update:modelValue', update.state.doc.toString())
           }
           emitHistoryAvailability()
+          emitEditorStatus()
         }),
       ],
     }),
@@ -278,6 +332,7 @@ onMounted(() => {
   })
 
   emitHistoryAvailability()
+  emitEditorStatus()
 })
 
 watch(

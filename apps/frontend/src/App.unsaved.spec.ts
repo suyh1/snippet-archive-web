@@ -84,6 +84,7 @@ describe('App unsaved guard', () => {
     store.files = [fileA, fileB]
     store.activeFileId = fileA.id
     store.draftContent = 'console.log(2)'
+    store.draftLanguage = fileA.language
     store.dirty = true
 
     await nextTick()
@@ -134,6 +135,7 @@ describe('App unsaved guard', () => {
     await vi.waitFor(() => {
       expect(workspaceApi.updateFile).toHaveBeenCalledWith('w1', 'f1', {
         content: 'console.log(2)',
+        language: 'typescript',
       })
     })
 

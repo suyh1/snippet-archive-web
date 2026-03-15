@@ -40,3 +40,15 @@ export type MoveWorkspaceFileInput = {
   targetPath: string
   targetOrder?: number
 }
+
+export type EditorSnapshotSource = 'manual' | 'format'
+
+export type EditorSnapshot = {
+  id: string
+  workspaceId: string
+  fileId: string
+  content: string
+  language: string
+  source: EditorSnapshotSource
+  createdAt: number
+}

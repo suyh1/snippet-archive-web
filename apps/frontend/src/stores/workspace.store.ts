@@ -2,22 +2,29 @@ import { defineStore } from 'pinia'
 import { workspaceApi } from '@/api/workspaces'
 import type {
   CreateWorkspaceFileInput,
+  EditorSnapshot,
+  EditorSnapshotSource,
   Workspace,
   WorkspaceFile,
 } from '@/types/workspace'
 import { basename, getParentPath, joinPath, normalizePath } from '@/utils/path'
 import { resolveWorkspaceErrorMessage } from '@/utils/error-message'
+import { normalizeLanguage } from '@/utils/language-detect'
 
 const DRAFT_CACHE_STORAGE_KEY = 'workspace-draft-cache-v1'
+const SNAPSHOT_CACHE_STORAGE_KEY = 'workspace-snapshot-cache-v1'
+const MAX_SNAPSHOTS_PER_FILE = 30
 
 type DraftCacheEntry = {
   workspaceId: string
   fileId: string
   content: string
+  language?: string
   updatedAt: number
 }
 
 type DraftCacheRecord = Record<string, DraftCacheEntry>
+type SnapshotCacheRecord = Record<string, EditorSnapshot[]>
 
 function getBrowserStorage() {
   if (typeof window === 'undefined') {
@@ -69,6 +76,44 @@ function writeDraftCacheToStorage(cache: DraftCacheRecord) {
   storage.setItem(DRAFT_CACHE_STORAGE_KEY, JSON.stringify(cache))
 }
 
+function readSnapshotCacheFromStorage(): SnapshotCacheRecord {
+  const storage = getBrowserStorage()
+  if (!storage) {
+    return {}
+  }
+
+  const raw = storage.getItem(SNAPSHOT_CACHE_STORAGE_KEY)
+  if (!raw) {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object') {
+      return {}
+    }
+
+    return parsed as SnapshotCacheRecord
+  } catch {
+    return {}
+  }
+}
+
+function writeSnapshotCacheToStorage(cache: SnapshotCacheRecord) {
+  const storage = getBrowserStorage()
+  if (!storage) {
+    return
+  }
+
+  const keys = Object.keys(cache)
+  if (keys.length === 0) {
+    storage.removeItem(SNAPSHOT_CACHE_STORAGE_KEY)
+    return
+  }
+
+  storage.setItem(SNAPSHOT_CACHE_STORAGE_KEY, JSON.stringify(cache))
+}
+
 function inferLanguage(name: string) {
   if (name.endsWith('.ts')) {
     return 'typescript'
@@ -90,6 +135,10 @@ function inferLanguage(name: string) {
     return 'markdown'
   }
 
+  if (name.endsWith('.html')) {
+    return 'html'
+  }
+
   return 'plaintext'
 }
 
@@ -100,6 +149,7 @@ export const useWorkspaceStore = defineStore('workspace', {
     currentWorkspaceId: null as string | null,
     activeFileId: null as string | null,
     draftContent: '',
+    draftLanguage: 'plaintext',
     dirty: false,
     loading: false,
     loadingFiles: false,
@@ -182,14 +232,140 @@ export const useWorkspaceStore = defineStore('workspace', {
       }
 
       const serverContent = file.content ?? ''
-      if (entry.content === serverContent) {
+      const serverLanguage = normalizeLanguage(file.language)
+      const entryLanguage = normalizeLanguage(entry.language ?? serverLanguage)
+
+      if (entry.content === serverContent && entryLanguage === serverLanguage) {
         this.removeDraftCacheEntry(workspaceId, file.id)
         return false
       }
 
       this.draftContent = entry.content
+      this.draftLanguage = entryLanguage
       this.dirty = true
       return true
+    },
+
+    buildSnapshotCacheKey(workspaceId: string, fileId: string) {
+      return `${workspaceId}:${fileId}`
+    },
+
+    listSnapshotsForFile(workspaceId: string, fileId: string) {
+      const cache = readSnapshotCacheFromStorage()
+      const key = this.buildSnapshotCacheKey(workspaceId, fileId)
+      return cache[key] ?? []
+    },
+
+    setSnapshotsForFile(workspaceId: string, fileId: string, snapshots: EditorSnapshot[]) {
+      const cache = readSnapshotCacheFromStorage()
+      const key = this.buildSnapshotCacheKey(workspaceId, fileId)
+      if (snapshots.length === 0) {
+        delete cache[key]
+      } else {
+        cache[key] = snapshots
+      }
+      writeSnapshotCacheToStorage(cache)
+    },
+
+    getActiveFileSnapshots() {
+      const workspaceId = this.currentWorkspaceId
+      const fileId = this.activeFileId
+      if (!workspaceId || !fileId) {
+        return []
+      }
+
+      return this.listSnapshotsForFile(workspaceId, fileId)
+    },
+
+    createSnapshotForActiveFile(source: EditorSnapshotSource = 'manual') {
+      const workspaceId = this.currentWorkspaceId
+      const active = this.files.find((item) => item.id === this.activeFileId)
+      if (!workspaceId || !active || active.kind !== 'file') {
+        return null
+      }
+
+      const existing = this.listSnapshotsForFile(workspaceId, active.id)
+      const normalizedLanguage = normalizeLanguage(this.draftLanguage)
+      const latest = existing[0]
+      if (
+        latest &&
+        latest.content === this.draftContent &&
+        normalizeLanguage(latest.language) === normalizedLanguage
+      ) {
+        return latest
+      }
+
+      const snapshot: EditorSnapshot = {
+        id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+        workspaceId,
+        fileId: active.id,
+        content: this.draftContent,
+        language: normalizedLanguage,
+        source,
+        createdAt: Date.now(),
+      }
+
+      const next = [snapshot, ...existing].slice(0, MAX_SNAPSHOTS_PER_FILE)
+      this.setSnapshotsForFile(workspaceId, active.id, next)
+      return snapshot
+    },
+
+    restoreSnapshotForActiveFile(snapshotId: string) {
+      const workspaceId = this.currentWorkspaceId
+      const active = this.files.find((item) => item.id === this.activeFileId)
+      if (!workspaceId || !active || active.kind !== 'file') {
+        return false
+      }
+
+      const snapshots = this.listSnapshotsForFile(workspaceId, active.id)
+      const target = snapshots.find((item) => item.id === snapshotId)
+      if (!target) {
+        return false
+      }
+
+      this.draftLanguage = normalizeLanguage(target.language)
+      this.setDraftContent(target.content)
+      return true
+    },
+
+    pruneWorkspaceSnapshots(workspaceId: string, currentFiles: WorkspaceFile[]) {
+      const cache = readSnapshotCacheFromStorage()
+      const currentFileIds = new Set(
+        currentFiles
+          .filter((file) => file.kind === 'file')
+          .map((file) => file.id),
+      )
+      let changed = false
+
+      for (const [key, snapshots] of Object.entries(cache)) {
+        if (!Array.isArray(snapshots) || snapshots.length === 0) {
+          delete cache[key]
+          changed = true
+          continue
+        }
+
+        const filtered = snapshots.filter((snapshot) => {
+          if (snapshot.workspaceId !== workspaceId) {
+            return true
+          }
+
+          return currentFileIds.has(snapshot.fileId)
+        })
+
+        if (filtered.length !== snapshots.length) {
+          changed = true
+        }
+
+        if (filtered.length === 0) {
+          delete cache[key]
+        } else if (filtered.length !== snapshots.length) {
+          cache[key] = filtered
+        }
+      }
+
+      if (changed) {
+        writeSnapshotCacheToStorage(cache)
+      }
     },
 
     clearError() {
@@ -199,6 +375,7 @@ export const useWorkspaceStore = defineStore('workspace', {
     resetEditor() {
       this.activeFileId = null
       this.draftContent = ''
+      this.draftLanguage = 'plaintext'
       this.dirty = false
     },
 
@@ -219,6 +396,7 @@ export const useWorkspaceStore = defineStore('workspace', {
 
       if (!this.dirty) {
         this.draftContent = selected.content ?? ''
+        this.draftLanguage = normalizeLanguage(selected.language)
       }
     },
 
@@ -256,6 +434,7 @@ export const useWorkspaceStore = defineStore('workspace', {
         this.resetEditor()
         this.files = await workspaceApi.listFiles(workspaceId)
         this.pruneWorkspaceDraftCache(workspaceId, this.files)
+        this.pruneWorkspaceSnapshots(workspaceId, this.files)
       } catch (error) {
         this.errorMessage = resolveWorkspaceErrorMessage(
           error,
@@ -313,10 +492,29 @@ export const useWorkspaceStore = defineStore('workspace', {
             writeDraftCacheToStorage(cache)
           }
 
+          const snapshotCache = readSnapshotCacheFromStorage()
+          let snapshotChanged = false
+          for (const [key, snapshots] of Object.entries(snapshotCache)) {
+            const filtered = snapshots.filter((snapshot) => snapshot.workspaceId !== workspaceId)
+            if (filtered.length !== snapshots.length) {
+              snapshotChanged = true
+            }
+
+            if (filtered.length === 0) {
+              delete snapshotCache[key]
+            } else if (filtered.length !== snapshots.length) {
+              snapshotCache[key] = filtered
+            }
+          }
+          if (snapshotChanged) {
+            writeSnapshotCacheToStorage(snapshotCache)
+          }
+
           this.currentWorkspaceId = next
           if (next) {
             this.files = await workspaceApi.listFiles(next)
             this.pruneWorkspaceDraftCache(next, this.files)
+            this.pruneWorkspaceSnapshots(next, this.files)
           } else {
             this.files = []
           }
@@ -345,6 +543,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       try {
         this.files = await workspaceApi.listFiles(this.currentWorkspaceId)
         this.pruneWorkspaceDraftCache(this.currentWorkspaceId, this.files)
+        this.pruneWorkspaceSnapshots(this.currentWorkspaceId, this.files)
         this.syncEditorWithFiles()
       } catch (error) {
         this.errorMessage = resolveWorkspaceErrorMessage(
@@ -368,6 +567,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       }
 
       this.draftContent = file.content ?? ''
+      this.draftLanguage = normalizeLanguage(file.language)
       this.dirty = false
     },
 
@@ -380,7 +580,9 @@ export const useWorkspaceStore = defineStore('workspace', {
         return
       }
 
-      this.dirty = content !== (active.content ?? '')
+      this.dirty =
+        content !== (active.content ?? '') ||
+        this.draftLanguage !== normalizeLanguage(active.language)
 
       if (!this.currentWorkspaceId) {
         return
@@ -391,6 +593,38 @@ export const useWorkspaceStore = defineStore('workspace', {
           workspaceId: this.currentWorkspaceId,
           fileId: active.id,
           content,
+          language: this.draftLanguage,
+          updatedAt: Date.now(),
+        })
+        return
+      }
+
+      this.removeDraftCacheEntry(this.currentWorkspaceId, active.id)
+    },
+
+    setDraftLanguage(language: string) {
+      this.draftLanguage = normalizeLanguage(language)
+
+      const active = this.files.find((item) => item.id === this.activeFileId)
+      if (!active || active.kind !== 'file') {
+        this.dirty = false
+        return
+      }
+
+      this.dirty =
+        this.draftContent !== (active.content ?? '') ||
+        this.draftLanguage !== normalizeLanguage(active.language)
+
+      if (!this.currentWorkspaceId) {
+        return
+      }
+
+      if (this.dirty) {
+        this.setDraftCacheEntry({
+          workspaceId: this.currentWorkspaceId,
+          fileId: active.id,
+          content: this.draftContent,
+          language: this.draftLanguage,
           updatedAt: Date.now(),
         })
         return
@@ -413,6 +647,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       try {
         await workspaceApi.updateFile(workspaceId, fileId, {
           content: this.draftContent,
+          language: this.draftLanguage,
         })
 
         this.removeDraftCacheEntry(workspaceId, fileId)
@@ -568,6 +803,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       try {
         await workspaceApi.deleteFile(workspaceId, fileId)
         this.removeDraftCacheEntry(workspaceId, fileId)
+        this.setSnapshotsForFile(workspaceId, fileId, [])
         await this.loadWorkspaceFiles()
       } catch (error) {
         this.errorMessage = resolveWorkspaceErrorMessage(

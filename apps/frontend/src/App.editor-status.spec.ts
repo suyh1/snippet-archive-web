@@ -31,6 +31,13 @@ vi.mock('@/features/workspace/CodeEditor.vue', () => {
         })
 
         emit('history-availability', { canUndo: false, canRedo: false })
+        emit('status-change', {
+          lineCount: 1,
+          cursorLine: 1,
+          cursorColumn: 1,
+          eol: 'LF',
+        })
+
         return () => h('div', { 'data-testid': 'code-editor-mock' })
       },
     }),
@@ -57,19 +64,16 @@ import App from './App.vue'
 import { workspaceApi } from '@/api/workspaces'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 
-describe('App editor tools', () => {
+describe('App editor status bar', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.mocked(workspaceApi.list).mockResolvedValue([])
-    editorCommandSpies.openSearchPanel.mockClear()
-    editorCommandSpies.openReplacePanel.mockClear()
-    editorCommandSpies.undo.mockClear()
-    editorCommandSpies.redo.mockClear()
   })
 
-  it('invokes search/replace and undo/redo toolbar commands with history availability', async () => {
+  it('shows language, lines, encoding and cursor status; language updates when paste detection fires', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
+
     const wrapper = mount(App, {
       global: {
         plugins: [pinia],
@@ -91,40 +95,36 @@ describe('App editor tools', () => {
       {
         id: 'f1',
         workspaceId: 'w1',
-        name: 'main.ts',
-        path: '/main.ts',
-        language: 'typescript',
-        content: 'const a = 1',
+        name: 'notes.txt',
+        path: '/notes.txt',
+        language: 'plaintext',
+        content: '',
         kind: 'file',
         order: 1,
       },
     ]
     store.activeFileId = 'f1'
-    store.draftContent = 'const a = 1'
+    store.draftContent = ''
 
     await nextTick()
 
-    expect(wrapper.get('[data-testid="editor-undo"]').attributes('disabled')).toBeDefined()
-    expect(wrapper.get('[data-testid="editor-redo"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="editor-statusbar"]').text()).toContain('Plain Text')
+    expect(wrapper.get('[data-testid="editor-status-encoding"]').text()).toContain('UTF-8')
 
-    await wrapper.get('[data-testid="editor-search"]').trigger('click')
-    await wrapper.get('[data-testid="editor-replace"]').trigger('click')
-    expect(editorCommandSpies.openSearchPanel).toHaveBeenCalledTimes(1)
-    expect(editorCommandSpies.openReplacePanel).toHaveBeenCalledTimes(1)
-
-    wrapper.findComponent({ name: 'CodeEditor' }).vm.$emit('history-availability', {
-      canUndo: true,
-      canRedo: true,
+    wrapper.findComponent({ name: 'CodeEditor' }).vm.$emit('status-change', {
+      lineCount: 3,
+      cursorLine: 2,
+      cursorColumn: 5,
+      eol: 'LF',
     })
     await nextTick()
 
-    expect(wrapper.get('[data-testid="editor-undo"]').attributes('disabled')).toBeUndefined()
-    expect(wrapper.get('[data-testid="editor-redo"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('[data-testid="editor-status-lines"]').text()).toContain('3 行')
+    expect(wrapper.get('[data-testid="editor-status-cursor"]').text()).toContain('Ln 2, Col 5')
 
-    await wrapper.get('[data-testid="editor-undo"]').trigger('click')
-    await wrapper.get('[data-testid="editor-redo"]').trigger('click')
+    wrapper.findComponent({ name: 'CodeEditor' }).vm.$emit('language-detected', 'typescript')
+    await nextTick()
 
-    expect(editorCommandSpies.undo).toHaveBeenCalledTimes(1)
-    expect(editorCommandSpies.redo).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('[data-testid="editor-status-language"]').text()).toContain('TypeScript')
   })
 })

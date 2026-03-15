@@ -100,6 +100,7 @@ describe('workspace store', () => {
     ]
     store.activeFileId = 'f1'
     store.draftContent = 'console.log(2)'
+    store.draftLanguage = 'typescript'
     store.dirty = true
 
     vi.mocked(workspaceApi.updateFile).mockResolvedValue({
@@ -117,6 +118,7 @@ describe('workspace store', () => {
 
     expect(workspaceApi.updateFile).toHaveBeenCalledWith('w1', 'f1', {
       content: 'console.log(2)',
+      language: 'typescript',
     })
     expect(store.dirty).toBe(false)
   })
