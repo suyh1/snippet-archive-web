@@ -30,6 +30,9 @@ const {
 const canSave = computed(() => {
   return !!activeFile.value && activeFile.value.kind === 'file' && dirty.value && !saving.value
 })
+const canUseEditorTools = computed(() => {
+  return !!activeFile.value && activeFile.value.kind === 'file' && !saving.value
+})
 
 const resolvingUnsavedSave = ref(false)
 const deleteConfirm = ref<{
@@ -46,6 +49,17 @@ const undoingFileDelete = ref(false)
 let deletedFileToastTimer: number | null = null
 let autoSaveTimer: number | null = null
 const AUTO_SAVE_DEBOUNCE_MS = 1800
+type CodeEditorHandle = {
+  openSearchPanel: () => boolean
+  openReplacePanel: () => boolean
+  undo: () => boolean
+  redo: () => boolean
+}
+const codeEditorRef = ref<CodeEditorHandle | null>(null)
+const historyAvailability = ref({
+  canUndo: false,
+  canRedo: false,
+})
 const {
   dialogOpen: unsavedDialogOpen,
   requestDecision,
@@ -190,6 +204,42 @@ function saveFile() {
   void workspaceStore.saveCurrentFile()
 }
 
+function openEditorSearch() {
+  if (!canUseEditorTools.value) {
+    return
+  }
+
+  codeEditorRef.value?.openSearchPanel()
+}
+
+function openEditorReplace() {
+  if (!canUseEditorTools.value) {
+    return
+  }
+
+  codeEditorRef.value?.openReplacePanel()
+}
+
+function undoEditorChange() {
+  if (!canUseEditorTools.value) {
+    return
+  }
+
+  codeEditorRef.value?.undo()
+}
+
+function redoEditorChange() {
+  if (!canUseEditorTools.value) {
+    return
+  }
+
+  codeEditorRef.value?.redo()
+}
+
+function updateHistoryAvailability(payload: { canUndo: boolean; canRedo: boolean }) {
+  historyAvailability.value = payload
+}
+
 function clearDeletedFileToastTimer() {
   if (deletedFileToastTimer !== null) {
     window.clearTimeout(deletedFileToastTimer)
@@ -278,6 +328,7 @@ watch(
   () => {
     hideDeletedFileToast()
     clearAutoSaveTimer()
+    historyAvailability.value = { canUndo: false, canRedo: false }
   },
 )
 
@@ -299,6 +350,13 @@ watch(
     autoSaveTimer = window.setTimeout(() => {
       void workspaceStore.saveCurrentFile()
     }, AUTO_SAVE_DEBOUNCE_MS)
+  },
+)
+
+watch(
+  () => activeFile.value?.id,
+  () => {
+    historyAvailability.value = { canUndo: false, canRedo: false }
   },
 )
 
@@ -401,6 +459,44 @@ onBeforeUnmount(() => {
               </div>
 
               <div class="editor-controls">
+                <div class="editor-tools" role="group" aria-label="编辑器工具">
+                  <button
+                    type="button"
+                    class="editor-tool-button"
+                    data-testid="editor-undo"
+                    :disabled="!canUseEditorTools || !historyAvailability.canUndo"
+                    @click="undoEditorChange"
+                  >
+                    撤销
+                  </button>
+                  <button
+                    type="button"
+                    class="editor-tool-button"
+                    data-testid="editor-redo"
+                    :disabled="!canUseEditorTools || !historyAvailability.canRedo"
+                    @click="redoEditorChange"
+                  >
+                    重做
+                  </button>
+                  <button
+                    type="button"
+                    class="editor-tool-button"
+                    data-testid="editor-search"
+                    :disabled="!canUseEditorTools"
+                    @click="openEditorSearch"
+                  >
+                    查找
+                  </button>
+                  <button
+                    type="button"
+                    class="editor-tool-button"
+                    data-testid="editor-replace"
+                    :disabled="!canUseEditorTools"
+                    @click="openEditorReplace"
+                  >
+                    替换
+                  </button>
+                </div>
                 <label class="theme-picker">
                   <span>主题</span>
                   <select v-model="editorTheme">
@@ -415,6 +511,7 @@ onBeforeUnmount(() => {
                 </label>
                 <button
                   type="button"
+                  class="save-button"
                   :disabled="!canSave"
                   @click="saveFile"
                 >
@@ -425,12 +522,14 @@ onBeforeUnmount(() => {
 
             <CodeEditor
               v-if="activeFile"
+              ref="codeEditorRef"
               :model-value="draftContent"
               :language="activeFile.language"
               :readonly="saving"
               :theme="editorTheme"
               @update:model-value="workspaceStore.setDraftContent"
               @save-shortcut="saveFile"
+              @history-availability="updateHistoryAvailability"
             />
 
             <p v-else class="editor-empty">
@@ -705,6 +804,12 @@ h2 {
   gap: 8px;
 }
 
+.editor-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .theme-picker {
   display: flex;
   align-items: center;
@@ -723,7 +828,23 @@ h2 {
   font-size: 12px;
 }
 
-.editor-head button {
+.editor-tool-button {
+  border: 1px solid rgba(148, 163, 184, 0.58);
+  background: rgba(248, 250, 252, 0.74);
+  color: #0f172a;
+  border-radius: 8px;
+  padding: 6px 9px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.editor-tool-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.save-button {
   border: 1px solid rgba(14, 165, 233, 0.5);
   background: linear-gradient(130deg, rgba(14, 165, 233, 0.9), rgba(56, 189, 248, 0.82));
   color: #f8fafc;
@@ -733,7 +854,7 @@ h2 {
   font-weight: 700;
 }
 
-.editor-head button:disabled {
+.save-button:disabled {
   opacity: 0.52;
   cursor: not-allowed;
 }

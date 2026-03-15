@@ -1,5 +1,15 @@
 <script setup lang="ts">
 import { Compartment, EditorState } from '@codemirror/state'
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  redo as redoCommand,
+  redoDepth,
+  undo as undoCommand,
+  undoDepth,
+} from '@codemirror/commands'
+import { openSearchPanel as openSearchPanelCommand, search, searchKeymap } from '@codemirror/search'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
 import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { javascript } from '@codemirror/lang-javascript'
@@ -27,6 +37,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   'update:modelValue': [value: string]
   'save-shortcut': []
+  'history-availability': [payload: { canUndo: boolean; canRedo: boolean }]
 }>()
 
 const editorRef = ref<HTMLElement | null>(null)
@@ -34,6 +45,76 @@ const languageCompartment = new Compartment()
 const editableCompartment = new Compartment()
 const themeCompartment = new Compartment()
 let view: EditorView | null = null
+
+function emitHistoryAvailability() {
+  if (!view) {
+    emit('history-availability', { canUndo: false, canRedo: false })
+    return
+  }
+
+  emit('history-availability', {
+    canUndo: undoDepth(view.state) > 0,
+    canRedo: redoDepth(view.state) > 0,
+  })
+}
+
+function openSearchPanel() {
+  if (!view) {
+    return false
+  }
+
+  return openSearchPanelCommand(view)
+}
+
+function openReplacePanel() {
+  if (!view) {
+    return false
+  }
+
+  const opened = openSearchPanelCommand(view)
+  if (!opened) {
+    return false
+  }
+
+  globalThis.setTimeout(() => {
+    const replaceInput = view?.dom.querySelector<HTMLInputElement>('.cm-search input[name="replace"]')
+    replaceInput?.focus()
+    replaceInput?.select()
+  }, 0)
+
+  return true
+}
+
+function undo() {
+  if (!view) {
+    return false
+  }
+
+  const applied = undoCommand(view)
+  if (applied) {
+    emitHistoryAvailability()
+  }
+  return applied
+}
+
+function redo() {
+  if (!view) {
+    return false
+  }
+
+  const applied = redoCommand(view)
+  if (applied) {
+    emitHistoryAvailability()
+  }
+  return applied
+}
+
+defineExpose({
+  openSearchPanel,
+  openReplacePanel,
+  undo,
+  redo,
+})
 
 function resolveLanguageExtension(language: string) {
   if (language === 'typescript') {
@@ -165,12 +246,17 @@ onMounted(() => {
       doc: props.modelValue,
       extensions: [
         lineNumbers(),
+        history(),
+        search({ top: true }),
         EditorView.lineWrapping,
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         languageCompartment.of(resolveLanguageExtension(props.language)),
         editableCompartment.of(EditorView.editable.of(!props.readonly)),
         themeCompartment.of(resolveThemeExtension(props.theme)),
         keymap.of([
+          ...defaultKeymap,
+          ...historyKeymap,
+          ...searchKeymap,
           {
             key: 'Mod-s',
             preventDefault: true,
@@ -184,11 +270,14 @@ onMounted(() => {
           if (update.docChanged) {
             emit('update:modelValue', update.state.doc.toString())
           }
+          emitHistoryAvailability()
         }),
       ],
     }),
     parent: editorRef.value,
   })
+
+  emitHistoryAvailability()
 })
 
 watch(
