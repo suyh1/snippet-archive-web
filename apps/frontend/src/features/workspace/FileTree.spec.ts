@@ -3,6 +3,19 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import FileTree from './FileTree.vue'
 
+function makeFile(index: number) {
+  return {
+    id: `file-${index}`,
+    workspaceId: 'w1',
+    name: `file-${index}.ts`,
+    path: `/file-${index}.ts`,
+    language: 'typescript',
+    content: '',
+    kind: 'file' as const,
+    order: index,
+  }
+}
+
 describe('FileTree', () => {
   it('creates inline draft row and emits createFile on blur', async () => {
     const wrapper = mount(FileTree, {
@@ -114,8 +127,11 @@ describe('FileTree', () => {
       },
     })
 
-    await wrapper.find('.row-main').trigger('click')
+    await wrapper.find('.row-select').trigger('click')
     await wrapper.find('[data-testid="delete-item"]').trigger('click')
+    expect(wrapper.emitted('delete-file')).toBeUndefined()
+
+    await wrapper.find('[data-testid="confirm-delete-file"]').trigger('click')
 
     expect(wrapper.emitted('select-file')).toEqual([['file-1']])
     expect(wrapper.emitted('delete-file')).toEqual([['file-1']])
@@ -220,5 +236,75 @@ describe('FileTree', () => {
     await rows[1].trigger('drop')
 
     expect(wrapper.text()).toContain('不能移动到自身子目录')
+  })
+
+  it('shows files in progressive segments and advances on show-more', async () => {
+    const files = Array.from({ length: 120 }, (_, index) => makeFile(index + 1))
+    const wrapper = mount(FileTree, {
+      props: {
+        files,
+      },
+    })
+
+    expect(wrapper.findAll('[data-testid="tree-row"]')).toHaveLength(16)
+    expect(wrapper.get('[data-testid="rows-segment-indicator"]').text()).toContain('1 /')
+    expect(wrapper.get('[data-testid="show-more-rows"]').text()).toContain('显示更多')
+
+    await wrapper.get('[data-testid="show-more-rows"]').trigger('click')
+
+    expect(wrapper.findAll('[data-testid="tree-row"]')).toHaveLength(16)
+    expect(wrapper.get('[data-testid="rows-segment-indicator"]').text()).toContain('2 /')
+  })
+
+  it('toggles folder descendants visibility when collapsing and expanding', async () => {
+    const wrapper = mount(FileTree, {
+      props: {
+        files: [
+          {
+            id: 'folder-src',
+            workspaceId: 'w1',
+            name: 'src',
+            path: '/src',
+            language: 'plaintext',
+            content: '',
+            kind: 'folder',
+            order: 1,
+          },
+          {
+            id: 'child-a',
+            workspaceId: 'w1',
+            name: 'a.ts',
+            path: '/src/a.ts',
+            language: 'typescript',
+            content: '',
+            kind: 'file',
+            order: 1,
+          },
+          {
+            id: 'child-b',
+            workspaceId: 'w1',
+            name: 'b.ts',
+            path: '/src/b.ts',
+            language: 'typescript',
+            content: '',
+            kind: 'file',
+            order: 2,
+          },
+        ],
+      },
+    })
+
+    expect(wrapper.text()).toContain('/src/a.ts')
+    expect(wrapper.text()).toContain('/src/b.ts')
+
+    await wrapper.get('[data-testid="toggle-folder-folder-src"]').trigger('click')
+
+    expect(wrapper.text()).not.toContain('/src/a.ts')
+    expect(wrapper.text()).not.toContain('/src/b.ts')
+
+    await wrapper.get('[data-testid="toggle-folder-folder-src"]').trigger('click')
+
+    expect(wrapper.text()).toContain('/src/a.ts')
+    expect(wrapper.text()).toContain('/src/b.ts')
   })
 })

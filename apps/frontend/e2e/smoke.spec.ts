@@ -24,19 +24,27 @@ test('smoke: create workspace, create file, drag move', async ({ page, request }
 
   await expect(page.getByRole('heading', { name: 'Smoke Workspace' }).first()).toBeVisible()
 
-  page.once('dialog', (dialog) => dialog.accept('dst'))
   await page.getByTestId('create-folder-root').click()
+  await page.getByTestId('create-inline-input').fill('dst')
+  await page.getByTestId('create-inline-input').press('Enter')
 
-  page.once('dialog', (dialog) => dialog.accept('main.ts'))
   await page.getByTestId('create-file-root').click()
+  await page.getByTestId('create-inline-input').fill('main.ts')
+  await page.getByTestId('create-inline-input').press('Enter')
 
-  await expect(page.getByText('/main.ts')).toBeVisible()
-  await expect(page.getByText('/dst')).toBeVisible()
+  await expect(
+    page.getByTestId('tree-row').filter({ hasText: '/main.ts' }).first(),
+  ).toBeVisible()
+  await expect(
+    page.getByTestId('tree-row').filter({ hasText: '/dst' }).first(),
+  ).toBeVisible()
 
   const fileRow = page.getByTestId('tree-row').filter({ hasText: '/main.ts' }).first()
   const folderRow = page.getByTestId('tree-row').filter({ hasText: '/dst' }).first()
 
   await fileRow.dragTo(folderRow)
 
-  await expect(page.getByText('/dst/main.ts')).toBeVisible()
+  await expect(
+    page.getByTestId('tree-row').filter({ hasText: '/dst/main.ts' }).first(),
+  ).toBeVisible()
 })
