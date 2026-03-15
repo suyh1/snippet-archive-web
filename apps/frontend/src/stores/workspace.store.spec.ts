@@ -123,6 +123,81 @@ describe('workspace store', () => {
     expect(store.dirty).toBe(false)
   })
 
+  it('allows manual language override on files with known suffix', async () => {
+    const store = useWorkspaceStore()
+    store.currentWorkspaceId = 'w1'
+    store.files = [
+      {
+        id: 'f1',
+        workspaceId: 'w1',
+        name: 'main.ts',
+        path: '/main.ts',
+        language: 'typescript',
+        content: 'console.log(1)',
+        kind: 'file',
+        order: 1,
+      },
+    ]
+
+    store.selectFile('f1')
+    store.setDraftLanguage('html')
+
+    expect(store.draftLanguage).toBe('html')
+    expect(store.dirty).toBe(true)
+  })
+
+  it('renames active file suffix when manual language changes', async () => {
+    const store = useWorkspaceStore()
+    store.currentWorkspaceId = 'w1'
+    store.files = [
+      {
+        id: 'f1',
+        workspaceId: 'w1',
+        name: 'main.ts',
+        path: '/main.ts',
+        language: 'typescript',
+        content: 'console.log(1)',
+        kind: 'file',
+        order: 1,
+      },
+    ]
+    store.activeFileId = 'f1'
+    store.draftContent = 'console.log(1)'
+    store.draftLanguage = 'typescript'
+
+    vi.mocked(workspaceApi.moveFile).mockResolvedValue({
+      ...store.files[0],
+      name: 'main.html',
+      path: '/main.html',
+      language: 'html',
+    })
+    vi.mocked(workspaceApi.updateFile).mockResolvedValue({
+      ...store.files[0],
+      name: 'main.html',
+      path: '/main.html',
+      language: 'html',
+    })
+    vi.mocked(workspaceApi.listFiles).mockResolvedValue([
+      {
+        ...store.files[0],
+        name: 'main.html',
+        path: '/main.html',
+        language: 'html',
+      },
+    ])
+
+    await store.applyActiveFileLanguagePreference('html')
+
+    expect(workspaceApi.moveFile).toHaveBeenCalledWith('w1', 'f1', {
+      targetPath: '/main.html',
+      targetOrder: 1,
+    })
+    expect(workspaceApi.updateFile).toHaveBeenCalledWith('w1', 'f1', {
+      name: 'main.html',
+      language: 'html',
+    })
+  })
+
   it('renames file by move api', async () => {
     const store = useWorkspaceStore()
     store.currentWorkspaceId = 'w1'
@@ -165,6 +240,51 @@ describe('workspace store', () => {
     })
     expect(workspaceApi.updateFile).toHaveBeenCalledWith('w1', 'f1', {
       name: 'entry.ts',
+      language: 'typescript',
+    })
+  })
+
+  it('updates language by suffix when renaming to a known extension', async () => {
+    const store = useWorkspaceStore()
+    store.currentWorkspaceId = 'w1'
+    store.files = [
+      {
+        id: 'f1',
+        workspaceId: 'w1',
+        name: 'scratch',
+        path: '/scratch',
+        language: 'plaintext',
+        content: '',
+        kind: 'file',
+        order: 1,
+      },
+    ]
+
+    vi.mocked(workspaceApi.moveFile).mockResolvedValue({
+      ...store.files[0],
+      name: 'notes.md',
+      path: '/notes.md',
+    })
+    vi.mocked(workspaceApi.updateFile).mockResolvedValue({
+      ...store.files[0],
+      name: 'notes.md',
+      path: '/notes.md',
+      language: 'markdown',
+    })
+    vi.mocked(workspaceApi.listFiles).mockResolvedValue([
+      {
+        ...store.files[0],
+        name: 'notes.md',
+        path: '/notes.md',
+        language: 'markdown',
+      },
+    ])
+
+    await store.renameFile('f1', 'notes.md')
+
+    expect(workspaceApi.updateFile).toHaveBeenCalledWith('w1', 'f1', {
+      name: 'notes.md',
+      language: 'markdown',
     })
   })
 

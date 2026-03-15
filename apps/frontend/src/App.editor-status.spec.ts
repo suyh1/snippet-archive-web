@@ -20,7 +20,6 @@ vi.mock('@/features/workspace/CodeEditor.vue', () => {
         'save-shortcut',
         'history-availability',
         'status-change',
-        'language-detected',
       ],
       setup(_props, { emit, expose }) {
         expose({
@@ -70,7 +69,7 @@ describe('App editor status bar', () => {
     vi.mocked(workspaceApi.list).mockResolvedValue([])
   })
 
-  it('shows language, lines, encoding and cursor status; language updates when paste detection fires', async () => {
+  it('shows language, lines, encoding and cursor status; manual selector updates language for extensionless files', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
 
@@ -95,8 +94,8 @@ describe('App editor status bar', () => {
       {
         id: 'f1',
         workspaceId: 'w1',
-        name: 'notes.txt',
-        path: '/notes.txt',
+        name: 'scratch',
+        path: '/scratch',
         language: 'plaintext',
         content: '',
         kind: 'file',
@@ -122,9 +121,106 @@ describe('App editor status bar', () => {
     expect(wrapper.get('[data-testid="editor-status-lines"]').text()).toContain('3 行')
     expect(wrapper.get('[data-testid="editor-status-cursor"]').text()).toContain('Ln 2, Col 5')
 
-    wrapper.findComponent({ name: 'CodeEditor' }).vm.$emit('language-detected', 'typescript')
+    const languageSelect = wrapper.get('[data-testid="editor-language-select"]')
+    expect(languageSelect.attributes('disabled')).toBeUndefined()
+
+    vi.mocked(workspaceApi.moveFile).mockResolvedValue({
+      ...store.files[0],
+      name: 'scratch.ts',
+      path: '/scratch.ts',
+      language: 'typescript',
+    })
+    vi.mocked(workspaceApi.updateFile).mockResolvedValue({
+      ...store.files[0],
+      name: 'scratch.ts',
+      path: '/scratch.ts',
+      language: 'typescript',
+    })
+    vi.mocked(workspaceApi.listFiles).mockResolvedValue([
+      {
+        ...store.files[0],
+        name: 'scratch.ts',
+        path: '/scratch.ts',
+        language: 'typescript',
+      },
+    ])
+
+    await languageSelect.setValue('typescript')
+    await vi.waitFor(() => {
+      expect(wrapper.get('[data-testid="editor-status-language"]').text()).toContain('TypeScript')
+      expect(store.draftLanguage).toBe('typescript')
+      expect(workspaceApi.moveFile).toHaveBeenCalled()
+    })
+  })
+
+  it('allows manual override for suffix-defined files', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+
+    const wrapper = mount(App, {
+      global: {
+        plugins: [pinia],
+      },
+    })
+
+    const store = useWorkspaceStore()
+    store.workspaces = [
+      {
+        id: 'w1',
+        title: 'Workspace 1',
+        description: '',
+        tags: [],
+        starred: false,
+      },
+    ]
+    store.currentWorkspaceId = 'w1'
+    store.files = [
+      {
+        id: 'f1',
+        workspaceId: 'w1',
+        name: 'main.ts',
+        path: '/main.ts',
+        language: 'typescript',
+        content: 'const a = 1',
+        kind: 'file',
+        order: 1,
+      },
+    ]
+    store.activeFileId = 'f1'
+    store.draftContent = 'const a = 1'
+    store.draftLanguage = 'typescript'
+
     await nextTick()
 
-    expect(wrapper.get('[data-testid="editor-status-language"]').text()).toContain('TypeScript')
+    const languageSelect = wrapper.get('[data-testid="editor-language-select"]')
+    expect(languageSelect.attributes('disabled')).toBeUndefined()
+
+    vi.mocked(workspaceApi.moveFile).mockResolvedValue({
+      ...store.files[0],
+      name: 'main.html',
+      path: '/main.html',
+      language: 'html',
+    })
+    vi.mocked(workspaceApi.updateFile).mockResolvedValue({
+      ...store.files[0],
+      name: 'main.html',
+      path: '/main.html',
+      language: 'html',
+    })
+    vi.mocked(workspaceApi.listFiles).mockResolvedValue([
+      {
+        ...store.files[0],
+        name: 'main.html',
+        path: '/main.html',
+        language: 'html',
+      },
+    ])
+
+    await languageSelect.setValue('html')
+    await vi.waitFor(() => {
+      expect(wrapper.get('[data-testid="editor-status-language"]').text()).toContain('HTML')
+      expect(store.draftLanguage).toBe('html')
+      expect(workspaceApi.moveFile).toHaveBeenCalled()
+    })
   })
 })

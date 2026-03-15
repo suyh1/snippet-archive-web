@@ -14,7 +14,12 @@ import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 import type { EditorSnapshot, WorkspaceFile } from '@/types/workspace'
 import { formatSnippetContent } from '@/utils/formatter'
-import { normalizeLanguage } from '@/utils/language-detect'
+import {
+  getLanguageLabel,
+  MANUAL_LANGUAGE_OPTIONS,
+  normalizeLanguage,
+  type SupportedEditorLanguage,
+} from '@/utils/language-detect'
 
 const workspaceStore = useWorkspaceStore()
 
@@ -92,20 +97,49 @@ const editorThemeOptions: Array<{ label: string; value: CodeEditorTheme }> = [
   { label: '水雾暮色', value: 'aqua-dusk' },
   { label: '珍珠浅光', value: 'pearl-light' },
 ]
-const languageLabelMap: Record<string, string> = {
-  plaintext: 'Plain Text',
-  typescript: 'TypeScript',
-  javascript: 'JavaScript',
-  json: 'JSON',
-  markdown: 'Markdown',
-  html: 'HTML',
-  vue: 'Vue',
-}
 const statusLanguageLabel = computed(() => {
   const language = normalizeLanguage(
     draftLanguage.value || activeFile.value?.language || 'plaintext',
   )
-  return languageLabelMap[language] ?? language
+  return getLanguageLabel(language)
+})
+type AppView = 'workspace' | 'settings'
+type SettingsTab = 'general' | 'languages'
+const currentView = ref<AppView>('workspace')
+const settingsTab = ref<SettingsTab>('languages')
+const languageSearchQuery = ref('')
+const isSettingsView = computed(() => currentView.value === 'settings')
+const pageTitle = computed(() => {
+  if (isSettingsView.value) {
+    return 'Settings'
+  }
+
+  return libraryMode.value
+    ? 'Library View'
+    : currentWorkspace.value?.title ?? 'Workspace'
+})
+const headerMetaText = computed(() => {
+  if (isSettingsView.value) {
+    return `${MANUAL_LANGUAGE_OPTIONS.length} supported languages`
+  }
+
+  return `${workspaces.value.length} workspaces · ${files.value.length} files`
+})
+const filteredLanguageOptions = computed(() => {
+  const keyword = languageSearchQuery.value.trim().toLowerCase()
+  if (!keyword) {
+    return MANUAL_LANGUAGE_OPTIONS
+  }
+
+  return MANUAL_LANGUAGE_OPTIONS.filter((item) => {
+    return (
+      item.label.toLowerCase().includes(keyword) ||
+      item.value.toLowerCase().includes(keyword)
+    )
+  })
+})
+const visibleLanguageCountText = computed(() => {
+  return `${filteredLanguageOptions.value.length} / ${MANUAL_LANGUAGE_OPTIONS.length}`
 })
 
 onMounted(async () => {
@@ -124,6 +158,32 @@ onMounted(async () => {
 watch(editorTheme, (theme) => {
   window.localStorage.setItem('editor-theme', theme)
 })
+
+function updateHashForView(view: AppView) {
+  const targetHash = view === 'settings' ? '#/settings' : '#/'
+  if (window.location.hash === targetHash) {
+    return
+  }
+
+  window.location.hash = targetHash
+}
+
+function openSettings() {
+  void runWithUnsavedGuard(() => {
+    currentView.value = 'settings'
+    settingsTab.value = 'languages'
+    updateHashForView('settings')
+  })
+}
+
+function backToWorkspaceView() {
+  currentView.value = 'workspace'
+  updateHashForView('workspace')
+}
+
+function switchSettingsTab(tab: SettingsTab) {
+  settingsTab.value = tab
+}
 
 function resolveUnsavedChoice(decision: 'save' | 'discard' | 'cancel') {
   resolveDecision(decision)
@@ -341,8 +401,13 @@ function updateEditorStatus(payload: EditorStatusPayload) {
   editorStatus.value = payload
 }
 
-function applyDetectedLanguage(language: string) {
-  workspaceStore.setDraftLanguage(language)
+async function updateLanguagePreference(event: Event) {
+  const target = event.target as HTMLSelectElement | null
+  if (!target) {
+    return
+  }
+
+  await workspaceStore.applyActiveFileLanguagePreference(target.value as SupportedEditorLanguage)
 }
 
 function clearDeletedFileToastTimer() {
@@ -497,25 +562,111 @@ onBeforeUnmount(() => {
       <header class="content-head">
         <div>
           <p class="eyebrow">Workspace Console</p>
-          <h2>
-            {{
-              libraryMode
-                ? 'Library View'
-                : currentWorkspace?.title ?? 'Workspace'
-            }}
-          </h2>
+          <h2>{{ pageTitle }}</h2>
         </div>
 
-        <p class="meta">
-          {{ workspaces.length }} workspaces · {{ files.length }} files
-        </p>
+        <div class="content-head-actions">
+          <p class="meta">
+            {{ headerMetaText }}
+          </p>
+          <button
+            v-if="isSettingsView"
+            type="button"
+            class="head-action-button"
+            data-testid="back-to-workspace"
+            @click="backToWorkspaceView"
+          >
+            返回工作台
+          </button>
+          <button
+            v-else
+            type="button"
+            class="head-action-button"
+            data-testid="open-settings"
+            @click="openSettings"
+          >
+            设置
+          </button>
+        </div>
       </header>
 
       <p v-if="errorMessage" class="error-banner">
         {{ errorMessage }}
       </p>
 
-      <section v-if="libraryMode" class="library-view">
+      <section
+        v-if="isSettingsView"
+        class="settings-view"
+        data-testid="settings-view"
+      >
+        <article class="summary-card summary-compact">
+          <h3>设置中心</h3>
+          <p>管理编辑器能力与展示信息。你可以在这里查看当前支持的全部语言。</p>
+        </article>
+
+        <section class="settings-panel">
+          <div class="settings-tabs" role="tablist" aria-label="设置选项卡">
+            <button
+              type="button"
+              class="settings-tab-button"
+              data-testid="settings-tab-general"
+              :aria-selected="settingsTab === 'general'"
+              @click="switchSettingsTab('general')"
+            >
+              常规
+            </button>
+            <button
+              type="button"
+              class="settings-tab-button"
+              data-testid="settings-tab-languages"
+              :aria-selected="settingsTab === 'languages'"
+              @click="switchSettingsTab('languages')"
+            >
+              支持语言
+            </button>
+          </div>
+
+          <section
+            v-if="settingsTab === 'general'"
+            class="settings-tab-panel"
+            data-testid="settings-panel-general"
+          >
+            <p>更多设置项会在后续版本补充，当前可在“支持语言”中查看编辑器语言清单。</p>
+          </section>
+
+          <section
+            v-else
+            class="settings-tab-panel"
+            data-testid="settings-panel-languages"
+          >
+            <header class="language-panel-head">
+              <p data-testid="settings-language-count">
+                当前显示 {{ visibleLanguageCountText }} 种语言
+              </p>
+              <input
+                v-model="languageSearchQuery"
+                data-testid="settings-language-search"
+                type="search"
+                placeholder="搜索语言名称或ID，如 python / typescript"
+              >
+            </header>
+
+            <ul class="language-list" data-testid="settings-language-list">
+              <li
+                v-for="item in filteredLanguageOptions"
+                :key="item.value"
+                class="language-item"
+                data-testid="settings-language-item"
+              >
+                <strong>{{ item.label }}</strong>
+                <code>{{ item.value }}</code>
+              </li>
+            </ul>
+          </section>
+        </section>
+      </section>
+
+      <section v-else-if="libraryMode" class="library-view">
         <article class="summary-card">
           <h3>准备好开始了吗？</h3>
           <p>
@@ -641,6 +792,23 @@ onBeforeUnmount(() => {
                     </option>
                   </select>
                 </label>
+                <label class="language-picker">
+                  <span>语言</span>
+                  <select
+                    data-testid="editor-language-select"
+                    :value="draftLanguage"
+                    :disabled="!canUseEditorTools"
+                    @change="updateLanguagePreference"
+                  >
+                    <option
+                      v-for="option in MANUAL_LANGUAGE_OPTIONS"
+                      :key="option.value"
+                      :value="option.value"
+                    >
+                      {{ option.label }}
+                    </option>
+                  </select>
+                </label>
                 <button
                   type="button"
                   class="save-button"
@@ -663,7 +831,6 @@ onBeforeUnmount(() => {
               @save-shortcut="saveFile"
               @history-availability="updateHistoryAvailability"
               @status-change="updateEditorStatus"
-              @language-detected="applyDetectedLanguage"
             />
 
             <footer
@@ -767,6 +934,12 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
+.content-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .eyebrow {
   margin: 0;
   color: #0369a1;
@@ -790,6 +963,17 @@ h2 {
   font-weight: 600;
 }
 
+.head-action-button {
+  border: 1px solid rgba(14, 165, 233, 0.46);
+  background: rgba(255, 255, 255, 0.76);
+  color: #0f172a;
+  border-radius: 9px;
+  padding: 7px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .error-banner {
   margin: 0;
   padding: 10px 12px;
@@ -801,7 +985,8 @@ h2 {
 }
 
 .library-view,
-.workspace-view {
+.workspace-view,
+.settings-view {
   min-height: 0;
 }
 
@@ -820,6 +1005,120 @@ h2 {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
+}
+
+.settings-view {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.settings-panel {
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.62), rgba(219, 234, 254, 0.36));
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.1);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.settings-tabs {
+  display: inline-flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+.settings-tab-button {
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 9px;
+  background: rgba(241, 245, 249, 0.7);
+  color: #334155;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.settings-tab-button[aria-selected='true'] {
+  border-color: rgba(14, 165, 233, 0.5);
+  background: rgba(14, 165, 233, 0.15);
+  color: #075985;
+}
+
+.settings-tab-panel {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: 12px;
+  gap: 10px;
+}
+
+.settings-tab-panel p {
+  margin: 0;
+  color: #334155;
+  font-size: 13px;
+}
+
+.language-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.language-panel-head input {
+  width: min(440px, 100%);
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  background: rgba(255, 255, 255, 0.84);
+  border-radius: 9px;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+.language-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-auto-rows: max-content;
+  align-content: start;
+  align-items: start;
+  gap: 8px;
+}
+
+.language-item {
+  border: 1px solid rgba(148, 163, 184, 0.36);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.65);
+  padding: 8px 10px;
+  display: grid;
+  align-content: start;
+  align-self: start;
+  gap: 3px;
+}
+
+.language-item strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.language-item code {
+  color: #0f172a;
+  font-size: 12px;
+  background: rgba(148, 163, 184, 0.18);
+  border-radius: 6px;
+  width: fit-content;
+  padding: 2px 6px;
 }
 
 .summary-card {
@@ -986,6 +1285,24 @@ h2 {
   font-size: 12px;
 }
 
+.language-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.language-picker select {
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  background: rgba(255, 255, 255, 0.78);
+  color: #0f172a;
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
 .editor-tool-button {
   border: 1px solid rgba(148, 163, 184, 0.58);
   background: rgba(248, 250, 252, 0.74);
@@ -1094,8 +1411,18 @@ h2 {
     flex-direction: column;
   }
 
+  .content-head-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
   .editor-head {
     align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .language-panel-head {
+    align-items: stretch;
     flex-direction: column;
   }
 }

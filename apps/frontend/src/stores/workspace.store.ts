@@ -9,7 +9,11 @@ import type {
 } from '@/types/workspace'
 import { basename, getParentPath, joinPath, normalizePath } from '@/utils/path'
 import { resolveWorkspaceErrorMessage } from '@/utils/error-message'
-import { normalizeLanguage } from '@/utils/language-detect'
+import {
+  applyLanguageToFileName,
+  inferLanguageFromFileName,
+  normalizeLanguage,
+} from '@/utils/language-detect'
 
 const DRAFT_CACHE_STORAGE_KEY = 'workspace-draft-cache-v1'
 const SNAPSHOT_CACHE_STORAGE_KEY = 'workspace-snapshot-cache-v1'
@@ -115,31 +119,7 @@ function writeSnapshotCacheToStorage(cache: SnapshotCacheRecord) {
 }
 
 function inferLanguage(name: string) {
-  if (name.endsWith('.ts')) {
-    return 'typescript'
-  }
-
-  if (name.endsWith('.js')) {
-    return 'javascript'
-  }
-
-  if (name.endsWith('.vue')) {
-    return 'vue'
-  }
-
-  if (name.endsWith('.json')) {
-    return 'json'
-  }
-
-  if (name.endsWith('.md')) {
-    return 'markdown'
-  }
-
-  if (name.endsWith('.html')) {
-    return 'html'
-  }
-
-  return 'plaintext'
+  return inferLanguageFromFileName(name) ?? 'plaintext'
 }
 
 export const useWorkspaceStore = defineStore('workspace', {
@@ -168,6 +148,10 @@ export const useWorkspaceStore = defineStore('workspace', {
     },
   },
   actions: {
+    resolveLanguageForFile(file: WorkspaceFile) {
+      return normalizeLanguage(file.language)
+    },
+
     buildDraftCacheKey(workspaceId: string, fileId: string) {
       return `${workspaceId}:${fileId}`
     },
@@ -232,7 +216,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       }
 
       const serverContent = file.content ?? ''
-      const serverLanguage = normalizeLanguage(file.language)
+      const serverLanguage = this.resolveLanguageForFile(file)
       const entryLanguage = normalizeLanguage(entry.language ?? serverLanguage)
 
       if (entry.content === serverContent && entryLanguage === serverLanguage) {
@@ -323,7 +307,7 @@ export const useWorkspaceStore = defineStore('workspace', {
         return false
       }
 
-      this.draftLanguage = normalizeLanguage(target.language)
+      this.setDraftLanguage(target.language)
       this.setDraftContent(target.content)
       return true
     },
@@ -396,7 +380,7 @@ export const useWorkspaceStore = defineStore('workspace', {
 
       if (!this.dirty) {
         this.draftContent = selected.content ?? ''
-        this.draftLanguage = normalizeLanguage(selected.language)
+        this.draftLanguage = this.resolveLanguageForFile(selected)
       }
     },
 
@@ -567,7 +551,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       }
 
       this.draftContent = file.content ?? ''
-      this.draftLanguage = normalizeLanguage(file.language)
+      this.draftLanguage = this.resolveLanguageForFile(file)
       this.dirty = false
     },
 
@@ -580,9 +564,10 @@ export const useWorkspaceStore = defineStore('workspace', {
         return
       }
 
+      const expectedLanguage = this.resolveLanguageForFile(active)
       this.dirty =
         content !== (active.content ?? '') ||
-        this.draftLanguage !== normalizeLanguage(active.language)
+        this.draftLanguage !== expectedLanguage
 
       if (!this.currentWorkspaceId) {
         return
@@ -603,17 +588,19 @@ export const useWorkspaceStore = defineStore('workspace', {
     },
 
     setDraftLanguage(language: string) {
-      this.draftLanguage = normalizeLanguage(language)
-
       const active = this.files.find((item) => item.id === this.activeFileId)
       if (!active || active.kind !== 'file') {
+        this.draftLanguage = normalizeLanguage(language)
         this.dirty = false
         return
       }
 
+      this.draftLanguage = normalizeLanguage(language)
+
+      const expectedLanguage = this.resolveLanguageForFile(active)
       this.dirty =
         this.draftContent !== (active.content ?? '') ||
-        this.draftLanguage !== normalizeLanguage(active.language)
+        this.draftLanguage !== expectedLanguage
 
       if (!this.currentWorkspaceId) {
         return
@@ -631,6 +618,52 @@ export const useWorkspaceStore = defineStore('workspace', {
       }
 
       this.removeDraftCacheEntry(this.currentWorkspaceId, active.id)
+    },
+
+    async applyActiveFileLanguagePreference(language: string) {
+      const active = this.files.find((item) => item.id === this.activeFileId)
+      if (!active || active.kind !== 'file') {
+        this.setDraftLanguage(language)
+        return
+      }
+
+      const normalizedLanguage = normalizeLanguage(language)
+      const nextName = applyLanguageToFileName(active.name, normalizedLanguage)
+
+      this.setDraftLanguage(normalizedLanguage)
+
+      if (nextName === active.name) {
+        return
+      }
+
+      await this.renameFile(active.id, nextName, normalizedLanguage)
+
+      const refreshed = this.files.find((item) => item.id === active.id)
+      if (!refreshed || refreshed.kind !== 'file') {
+        return
+      }
+
+      const expectedLanguage = this.resolveLanguageForFile(refreshed)
+      this.dirty =
+        this.draftContent !== (refreshed.content ?? '') ||
+        this.draftLanguage !== expectedLanguage
+
+      if (!this.currentWorkspaceId) {
+        return
+      }
+
+      if (this.dirty) {
+        this.setDraftCacheEntry({
+          workspaceId: this.currentWorkspaceId,
+          fileId: refreshed.id,
+          content: this.draftContent,
+          language: this.draftLanguage,
+          updatedAt: Date.now(),
+        })
+        return
+      }
+
+      this.removeDraftCacheEntry(this.currentWorkspaceId, refreshed.id)
     },
 
     async saveCurrentFile() {
@@ -752,7 +785,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       }
     },
 
-    async renameFile(fileId: string, newName: string) {
+    async renameFile(fileId: string, newName: string, languageOverride?: string) {
       const workspaceId = this.currentWorkspaceId
       if (!workspaceId) {
         return
@@ -769,6 +802,9 @@ export const useWorkspaceStore = defineStore('workspace', {
       }
 
       const targetPath = normalizePath(joinPath(getParentPath(file.path), trimmed))
+      const targetLanguage = normalizeLanguage(
+        languageOverride ?? inferLanguageFromFileName(trimmed) ?? file.language,
+      )
 
       this.errorMessage = null
 
@@ -780,6 +816,7 @@ export const useWorkspaceStore = defineStore('workspace', {
 
         await workspaceApi.updateFile(workspaceId, fileId, {
           name: trimmed,
+          language: targetLanguage,
         })
 
         await this.loadWorkspaceFiles()

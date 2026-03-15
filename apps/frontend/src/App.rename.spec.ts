@@ -154,6 +154,7 @@ describe('App inline rename', () => {
       })
       expect(workspaceApi.updateFile).toHaveBeenCalledWith('w1', 'f1', {
         name: 'feature.ts',
+        language: 'typescript',
       })
     })
 
