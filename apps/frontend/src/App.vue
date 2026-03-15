@@ -44,6 +44,8 @@ const deleteConfirmLoading = ref(false)
 const deletedFileToast = ref<WorkspaceFile | null>(null)
 const undoingFileDelete = ref(false)
 let deletedFileToastTimer: number | null = null
+let autoSaveTimer: number | null = null
+const AUTO_SAVE_DEBOUNCE_MS = 1800
 const {
   dialogOpen: unsavedDialogOpen,
   requestDecision,
@@ -195,6 +197,13 @@ function clearDeletedFileToastTimer() {
   }
 }
 
+function clearAutoSaveTimer() {
+  if (autoSaveTimer !== null) {
+    window.clearTimeout(autoSaveTimer)
+    autoSaveTimer = null
+  }
+}
+
 function hideDeletedFileToast() {
   deletedFileToast.value = null
   undoingFileDelete.value = false
@@ -268,11 +277,34 @@ watch(
   () => currentWorkspaceId.value,
   () => {
     hideDeletedFileToast()
+    clearAutoSaveTimer()
+  },
+)
+
+watch(
+  [
+    () => dirty.value,
+    () => activeFile.value?.id,
+    () => activeFile.value?.kind,
+    () => draftContent.value,
+    () => saving.value,
+  ],
+  ([isDirty, activeId, activeKind, _draft, isSaving]) => {
+    if (!isDirty || !activeId || activeKind !== 'file' || isSaving) {
+      clearAutoSaveTimer()
+      return
+    }
+
+    clearAutoSaveTimer()
+    autoSaveTimer = window.setTimeout(() => {
+      void workspaceStore.saveCurrentFile()
+    }, AUTO_SAVE_DEBOUNCE_MS)
   },
 )
 
 onBeforeUnmount(() => {
   clearDeletedFileToastTimer()
+  clearAutoSaveTimer()
 })
 </script>
 

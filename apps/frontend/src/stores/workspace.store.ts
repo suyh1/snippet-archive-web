@@ -8,6 +8,67 @@ import type {
 import { basename, getParentPath, joinPath, normalizePath } from '@/utils/path'
 import { resolveWorkspaceErrorMessage } from '@/utils/error-message'
 
+const DRAFT_CACHE_STORAGE_KEY = 'workspace-draft-cache-v1'
+
+type DraftCacheEntry = {
+  workspaceId: string
+  fileId: string
+  content: string
+  updatedAt: number
+}
+
+type DraftCacheRecord = Record<string, DraftCacheEntry>
+
+function getBrowserStorage() {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  try {
+    return window.localStorage
+  } catch {
+    return null
+  }
+}
+
+function readDraftCacheFromStorage(): DraftCacheRecord {
+  const storage = getBrowserStorage()
+  if (!storage) {
+    return {}
+  }
+
+  const raw = storage.getItem(DRAFT_CACHE_STORAGE_KEY)
+  if (!raw) {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object') {
+      return {}
+    }
+
+    return parsed as DraftCacheRecord
+  } catch {
+    return {}
+  }
+}
+
+function writeDraftCacheToStorage(cache: DraftCacheRecord) {
+  const storage = getBrowserStorage()
+  if (!storage) {
+    return
+  }
+
+  const keys = Object.keys(cache)
+  if (keys.length === 0) {
+    storage.removeItem(DRAFT_CACHE_STORAGE_KEY)
+    return
+  }
+
+  storage.setItem(DRAFT_CACHE_STORAGE_KEY, JSON.stringify(cache))
+}
+
 function inferLanguage(name: string) {
   if (name.endsWith('.ts')) {
     return 'typescript'
@@ -57,6 +118,80 @@ export const useWorkspaceStore = defineStore('workspace', {
     },
   },
   actions: {
+    buildDraftCacheKey(workspaceId: string, fileId: string) {
+      return `${workspaceId}:${fileId}`
+    },
+
+    getDraftCacheEntry(workspaceId: string, fileId: string) {
+      const cache = readDraftCacheFromStorage()
+      return cache[this.buildDraftCacheKey(workspaceId, fileId)] ?? null
+    },
+
+    setDraftCacheEntry(entry: DraftCacheEntry) {
+      const cache = readDraftCacheFromStorage()
+      cache[this.buildDraftCacheKey(entry.workspaceId, entry.fileId)] = entry
+      writeDraftCacheToStorage(cache)
+    },
+
+    removeDraftCacheEntry(workspaceId: string, fileId: string) {
+      const cache = readDraftCacheFromStorage()
+      const key = this.buildDraftCacheKey(workspaceId, fileId)
+
+      if (!(key in cache)) {
+        return
+      }
+
+      delete cache[key]
+      writeDraftCacheToStorage(cache)
+    },
+
+    pruneWorkspaceDraftCache(workspaceId: string, currentFiles: WorkspaceFile[]) {
+      const cache = readDraftCacheFromStorage()
+      const currentFileIds = new Set(currentFiles.map((file) => file.id))
+      let changed = false
+
+      for (const [key, entry] of Object.entries(cache)) {
+        if (entry.workspaceId !== workspaceId) {
+          continue
+        }
+
+        if (!currentFileIds.has(entry.fileId)) {
+          delete cache[key]
+          changed = true
+        }
+      }
+
+      if (changed) {
+        writeDraftCacheToStorage(cache)
+      }
+    },
+
+    tryRestoreDraftForFile(file: WorkspaceFile) {
+      if (file.kind !== 'file') {
+        return false
+      }
+
+      const workspaceId = this.currentWorkspaceId
+      if (!workspaceId) {
+        return false
+      }
+
+      const entry = this.getDraftCacheEntry(workspaceId, file.id)
+      if (!entry) {
+        return false
+      }
+
+      const serverContent = file.content ?? ''
+      if (entry.content === serverContent) {
+        this.removeDraftCacheEntry(workspaceId, file.id)
+        return false
+      }
+
+      this.draftContent = entry.content
+      this.dirty = true
+      return true
+    },
+
     clearError() {
       this.errorMessage = null
     },
@@ -75,6 +210,10 @@ export const useWorkspaceStore = defineStore('workspace', {
       const selected = this.files.find((item) => item.id === this.activeFileId)
       if (!selected || selected.kind !== 'file') {
         this.resetEditor()
+        return
+      }
+
+      if (this.tryRestoreDraftForFile(selected)) {
         return
       }
 
@@ -116,6 +255,7 @@ export const useWorkspaceStore = defineStore('workspace', {
         this.currentWorkspaceId = workspaceId
         this.resetEditor()
         this.files = await workspaceApi.listFiles(workspaceId)
+        this.pruneWorkspaceDraftCache(workspaceId, this.files)
       } catch (error) {
         this.errorMessage = resolveWorkspaceErrorMessage(
           error,
@@ -161,9 +301,22 @@ export const useWorkspaceStore = defineStore('workspace', {
 
         if (this.currentWorkspaceId === workspaceId) {
           const next = this.workspaces[0]?.id ?? null
+          const cache = readDraftCacheFromStorage()
+          let changed = false
+          for (const [key, entry] of Object.entries(cache)) {
+            if (entry.workspaceId === workspaceId) {
+              delete cache[key]
+              changed = true
+            }
+          }
+          if (changed) {
+            writeDraftCacheToStorage(cache)
+          }
+
           this.currentWorkspaceId = next
           if (next) {
             this.files = await workspaceApi.listFiles(next)
+            this.pruneWorkspaceDraftCache(next, this.files)
           } else {
             this.files = []
           }
@@ -191,6 +344,7 @@ export const useWorkspaceStore = defineStore('workspace', {
 
       try {
         this.files = await workspaceApi.listFiles(this.currentWorkspaceId)
+        this.pruneWorkspaceDraftCache(this.currentWorkspaceId, this.files)
         this.syncEditorWithFiles()
       } catch (error) {
         this.errorMessage = resolveWorkspaceErrorMessage(
@@ -209,6 +363,10 @@ export const useWorkspaceStore = defineStore('workspace', {
       }
 
       this.activeFileId = file.id
+      if (this.tryRestoreDraftForFile(file)) {
+        return
+      }
+
       this.draftContent = file.content ?? ''
       this.dirty = false
     },
@@ -223,6 +381,22 @@ export const useWorkspaceStore = defineStore('workspace', {
       }
 
       this.dirty = content !== (active.content ?? '')
+
+      if (!this.currentWorkspaceId) {
+        return
+      }
+
+      if (this.dirty) {
+        this.setDraftCacheEntry({
+          workspaceId: this.currentWorkspaceId,
+          fileId: active.id,
+          content,
+          updatedAt: Date.now(),
+        })
+        return
+      }
+
+      this.removeDraftCacheEntry(this.currentWorkspaceId, active.id)
     },
 
     async saveCurrentFile() {
@@ -241,6 +415,7 @@ export const useWorkspaceStore = defineStore('workspace', {
           content: this.draftContent,
         })
 
+        this.removeDraftCacheEntry(workspaceId, fileId)
         await this.loadWorkspaceFiles()
         this.dirty = false
       } catch (error) {
@@ -392,6 +567,7 @@ export const useWorkspaceStore = defineStore('workspace', {
 
       try {
         await workspaceApi.deleteFile(workspaceId, fileId)
+        this.removeDraftCacheEntry(workspaceId, fileId)
         await this.loadWorkspaceFiles()
       } catch (error) {
         this.errorMessage = resolveWorkspaceErrorMessage(
