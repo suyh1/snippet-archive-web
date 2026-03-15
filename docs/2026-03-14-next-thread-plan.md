@@ -22,7 +22,7 @@
 - PostgreSQL 16（Docker）
 - 连接: `postgresql://snippet:snippet@localhost:54329/snippet_archive`
 
-## 2. 当前状态（截至 2026-03-15）
+## 2. 当前状态（截至 2026-03-15，Task H 完成）
 
 - 新项目目录已建立: `/Users/subeipo/Documents/code/utools/snippet-archive-web`
 - 前端基础脚手架可构建
@@ -50,6 +50,10 @@
 - 前端 Playwright 冒烟 e2e 已补充（新建 workspace -> 新建文件 -> 拖拽移动）
 - 前端错误提示文案已统一为用户友好提示（按 error.code 映射）
 - Library / Workspace / Editor 关键空状态提示已优化
+- 编辑器已升级为 CodeMirror 6（行号 + 语法高亮）
+- 已支持 Cmd/Ctrl + S 快捷保存
+- 已支持未保存保护：浏览器离开提示 + 应用内切换三分支弹窗（保存并继续/放弃/取消）
+- 重命名交互已升级为弹窗输入，支持严格即时校验与同级冲突提示
 - PostgreSQL 容器已启动并可用
 - Prisma Client 已生成，`db push` 已通过
 
@@ -60,7 +64,7 @@
 2. 增加前端端到端冒烟测试（关键路径：新建 workspace -> 新建文件 -> 拖拽移动）
 3. 梳理错误提示文案与空状态体验
 
-### Task H: 编辑器体验增强（下一优先）
+### Task H: 编辑器体验增强（已完成）
 1. 将当前 `textarea` 编辑器升级为 CodeMirror 6（语法高亮 + 行号）
 2. 增加保存快捷键（`Cmd/Ctrl + S`）与离开页面未保存提示
 3. 增加重命名输入校验与冲突提示（前端即时反馈）

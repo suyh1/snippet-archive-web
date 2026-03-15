@@ -1,9 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
+import CodeEditor from '@/features/workspace/CodeEditor.vue'
 import FileTree from '@/features/workspace/FileTree.vue'
+import RenameDialog from '@/features/workspace/RenameDialog.vue'
+import UnsavedChangesDialog from '@/features/workspace/UnsavedChangesDialog.vue'
 import WorkspaceSidebar from '@/features/workspace/WorkspaceSidebar.vue'
+import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import { useWorkspaceStore } from '@/stores/workspace.store'
+import { getParentPath } from '@/utils/path'
+import { validateRenameInput } from '@/utils/rename-validation'
 
 const workspaceStore = useWorkspaceStore()
 
@@ -26,12 +32,92 @@ const canSave = computed(() => {
   return !!activeFile.value && activeFile.value.kind === 'file' && dirty.value && !saving.value
 })
 
+const resolvingUnsavedSave = ref(false)
+const {
+  dialogOpen: unsavedDialogOpen,
+  requestDecision,
+  resolveDecision,
+} = useUnsavedGuard(dirty)
+const renameDialogOpen = ref(false)
+const renameTargetId = ref<string | null>(null)
+const renameDraftValue = ref('')
+const renameSubmitting = ref(false)
+
+const renameTarget = computed(() => {
+  if (!renameTargetId.value) {
+    return null
+  }
+
+  return files.value.find((item) => item.id === renameTargetId.value) ?? null
+})
+
+const renameSiblingNames = computed(() => {
+  if (!renameTarget.value) {
+    return []
+  }
+
+  const parentPath = getParentPath(renameTarget.value.path)
+  return files.value
+    .filter(
+      (item) =>
+        item.id !== renameTarget.value?.id &&
+        getParentPath(item.path) === parentPath,
+    )
+    .map((item) => item.name)
+})
+
+const renameErrorMessage = computed(() => {
+  if (!renameDialogOpen.value) {
+    return null
+  }
+
+  return validateRenameInput(renameDraftValue.value, renameSiblingNames.value)
+})
+
+const renameConfirmDisabled = computed(() => {
+  return !renameTarget.value || !!renameErrorMessage.value || renameSubmitting.value
+})
+
 onMounted(async () => {
   await workspaceStore.loadWorkspaces()
 })
 
+function resolveUnsavedChoice(decision: 'save' | 'discard' | 'cancel') {
+  resolveDecision(decision)
+}
+
+async function runWithUnsavedGuard(action: () => void | Promise<void>) {
+  if (!dirty.value) {
+    await action()
+    return
+  }
+
+  const decision = await requestDecision()
+  if (decision === 'cancel') {
+    return
+  }
+
+  if (decision === 'save') {
+    resolvingUnsavedSave.value = true
+    await workspaceStore.saveCurrentFile()
+    resolvingUnsavedSave.value = false
+
+    if (dirty.value) {
+      return
+    }
+  }
+
+  await action()
+}
+
 function openWorkspace(workspaceId: string) {
-  void workspaceStore.openWorkspace(workspaceId)
+  if (workspaceId === currentWorkspaceId.value) {
+    return
+  }
+
+  void runWithUnsavedGuard(async () => {
+    await workspaceStore.openWorkspace(workspaceId)
+  })
 }
 
 function createWorkspace(title: string) {
@@ -50,9 +136,15 @@ function deleteWorkspace(workspaceId: string) {
 }
 
 function backToLibrary() {
-  workspaceStore.currentWorkspaceId = null
-  workspaceStore.files = []
-  workspaceStore.resetEditor()
+  if (libraryMode.value) {
+    return
+  }
+
+  void runWithUnsavedGuard(() => {
+    workspaceStore.currentWorkspaceId = null
+    workspaceStore.files = []
+    workspaceStore.resetEditor()
+  })
 }
 
 function createFile(parentPath: string) {
@@ -80,21 +172,55 @@ function moveFile(payload: { fileId: string; targetParentPath: string }) {
 }
 
 function selectFile(fileId: string) {
-  workspaceStore.selectFile(fileId)
+  if (fileId === activeFile.value?.id) {
+    return
+  }
+
+  void runWithUnsavedGuard(() => {
+    workspaceStore.selectFile(fileId)
+  })
 }
 
-function renameFile(fileId: string) {
+function openRenameDialog(fileId: string) {
   const target = files.value.find((item) => item.id === fileId)
   if (!target) {
     return
   }
 
-  const nextName = window.prompt('输入新名称', target.name)?.trim()
-  if (!nextName || nextName === target.name) {
+  renameTargetId.value = fileId
+  renameDraftValue.value = target.name
+  renameDialogOpen.value = true
+}
+
+function closeRenameDialog() {
+  renameDialogOpen.value = false
+  renameTargetId.value = null
+  renameDraftValue.value = ''
+  renameSubmitting.value = false
+}
+
+async function confirmRename() {
+  if (!renameTarget.value) {
     return
   }
 
-  void workspaceStore.renameFile(fileId, nextName)
+  const nextName = renameDraftValue.value
+  if (nextName === renameTarget.value.name) {
+    closeRenameDialog()
+    return
+  }
+
+  if (validateRenameInput(nextName, renameSiblingNames.value)) {
+    return
+  }
+
+  renameSubmitting.value = true
+  await workspaceStore.renameFile(renameTarget.value.id, nextName)
+  renameSubmitting.value = false
+
+  if (!workspaceStore.errorMessage) {
+    closeRenameDialog()
+  }
 }
 
 function deleteFile(fileId: string) {
@@ -106,11 +232,6 @@ function deleteFile(fileId: string) {
   }
 
   void workspaceStore.deleteFile(fileId)
-}
-
-function onDraftInput(event: Event) {
-  const value = (event.target as HTMLTextAreaElement).value
-  workspaceStore.setDraftContent(value)
 }
 
 function saveFile() {
@@ -197,7 +318,7 @@ function saveFile() {
             @create-folder="createFolder"
             @move-file="moveFile"
             @select-file="selectFile"
-            @rename-file="renameFile"
+            @rename-file="openRenameDialog"
             @delete-file="deleteFile"
           />
 
@@ -213,11 +334,13 @@ function saveFile() {
               </button>
             </header>
 
-            <textarea
+            <CodeEditor
               v-if="activeFile"
-              class="editor-textarea"
-              :value="draftContent"
-              @input="onDraftInput"
+              :model-value="draftContent"
+              :language="activeFile.language"
+              :readonly="saving"
+              @update:model-value="workspaceStore.setDraftContent"
+              @save-shortcut="saveFile"
             />
 
             <p v-else class="editor-empty">
@@ -227,6 +350,25 @@ function saveFile() {
         </div>
       </section>
     </section>
+
+    <UnsavedChangesDialog
+      :open="unsavedDialogOpen"
+      :saving="resolvingUnsavedSave"
+      @save="resolveUnsavedChoice('save')"
+      @discard="resolveUnsavedChoice('discard')"
+      @cancel="resolveUnsavedChoice('cancel')"
+    />
+
+    <RenameDialog
+      :open="renameDialogOpen"
+      :value="renameDraftValue"
+      :error-message="renameErrorMessage"
+      :submitting="renameSubmitting"
+      :confirm-disabled="renameConfirmDisabled"
+      @update:value="renameDraftValue = $event"
+      @confirm="confirmRename"
+      @cancel="closeRenameDialog"
+    />
   </main>
 </template>
 
@@ -381,21 +523,6 @@ h2 {
 .editor-head button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-.editor-textarea {
-  width: 100%;
-  height: 100%;
-  border: none;
-  padding: 12px;
-  resize: none;
-  outline: none;
-  font-family: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  background: #0f172a;
-  color: #e2e8f0;
-  border-radius: 0 0 16px 16px;
 }
 
 .editor-empty {

@@ -7,3 +7,5 @@ coverage/
 !.env.example
 .DS_Store
 .idea/
+apps/frontend/test-results/
+apps/frontend/playwright-report/
