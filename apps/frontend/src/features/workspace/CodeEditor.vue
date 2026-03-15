@@ -12,12 +12,8 @@ import {
 import { openSearchPanel as openSearchPanelCommand, search, searchKeymap } from '@codemirror/search'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
 import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
-import { javascript } from '@codemirror/lang-javascript'
-import { json } from '@codemirror/lang-json'
-import { markdown } from '@codemirror/lang-markdown'
-import { html } from '@codemirror/lang-html'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { detectLanguageFromSnippet, normalizeLanguage } from '@/utils/language-detect'
+import { loadLanguageExtension } from '@/utils/language-detect'
 
 export type CodeEditorTheme = 'glacier-night' | 'aqua-dusk' | 'pearl-light'
 export type EditorStatusPayload = {
@@ -46,7 +42,6 @@ const emit = defineEmits<{
   'save-shortcut': []
   'history-availability': [payload: { canUndo: boolean; canRedo: boolean }]
   'status-change': [payload: EditorStatusPayload]
-  'language-detected': [language: string]
 }>()
 
 const editorRef = ref<HTMLElement | null>(null)
@@ -54,6 +49,7 @@ const languageCompartment = new Compartment()
 const editableCompartment = new Compartment()
 const themeCompartment = new Compartment()
 let view: EditorView | null = null
+let languageLoadVersion = 0
 
 function emitHistoryAvailability() {
   if (!view) {
@@ -152,28 +148,20 @@ defineExpose({
   redo,
 })
 
-function resolveLanguageExtension(language: string) {
-  if (language === 'typescript') {
-    return javascript({ typescript: true })
+async function applyLanguageExtension(language: string) {
+  if (!view) {
+    return
   }
 
-  if (language === 'javascript') {
-    return javascript()
+  const currentVersion = ++languageLoadVersion
+  const extension = await loadLanguageExtension(language)
+  if (!view || currentVersion !== languageLoadVersion) {
+    return
   }
 
-  if (language === 'json') {
-    return json()
-  }
-
-  if (language === 'markdown') {
-    return markdown()
-  }
-
-  if (language === 'vue' || language === 'html') {
-    return html()
-  }
-
-  return []
+  view.dispatch({
+    effects: languageCompartment.reconfigure(extension),
+  })
 }
 
 function resolveThemeExtension(theme: CodeEditorTheme) {
@@ -286,7 +274,7 @@ onMounted(() => {
         search({ top: true }),
         EditorView.lineWrapping,
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-        languageCompartment.of(resolveLanguageExtension(props.language)),
+        languageCompartment.of([]),
         editableCompartment.of(EditorView.editable.of(!props.readonly)),
         themeCompartment.of(resolveThemeExtension(props.theme)),
         keymap.of([
@@ -302,23 +290,6 @@ onMounted(() => {
             },
           },
         ]),
-        EditorView.domEventHandlers({
-          paste: (event) => {
-            const clipboardEvent = event as ClipboardEvent
-            const clipboardText = clipboardEvent.clipboardData?.getData('text/plain') ?? ''
-            const detectedLanguage = detectLanguageFromSnippet(clipboardText)
-            if (!detectedLanguage) {
-              return false
-            }
-
-            const currentLanguage = normalizeLanguage(props.language)
-            if (detectedLanguage !== currentLanguage) {
-              emit('language-detected', detectedLanguage)
-            }
-
-            return false
-          },
-        }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             emit('update:modelValue', update.state.doc.toString())
@@ -333,6 +304,7 @@ onMounted(() => {
 
   emitHistoryAvailability()
   emitEditorStatus()
+  void applyLanguageExtension(props.language)
 })
 
 watch(
@@ -360,13 +332,7 @@ watch(
 watch(
   () => props.language,
   (language) => {
-    if (!view) {
-      return
-    }
-
-    view.dispatch({
-      effects: languageCompartment.reconfigure(resolveLanguageExtension(language)),
-    })
+    void applyLanguageExtension(language)
   },
 )
 

@@ -20,7 +20,6 @@ vi.mock('@/features/workspace/CodeEditor.vue', () => {
         'save-shortcut',
         'history-availability',
         'status-change',
-        'language-detected',
       ],
       setup(_props, { emit, expose }) {
         expose({
