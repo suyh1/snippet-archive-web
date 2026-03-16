@@ -186,6 +186,37 @@ paths:
                 $ref: '#/components/schemas/DeleteIdResponse'
         '404':
           $ref: '#/components/responses/NotFoundError'
+  /api/workspaces/{workspaceId}/files/{fileId}/revisions:
+    get:
+      summary: List workspace file revisions
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/FileId'
+      responses:
+        '200':
+          description: Workspace file revision list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceFileRevisionListResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+  /api/workspaces/{workspaceId}/files/{fileId}/revisions/{revisionId}/restore:
+    post:
+      summary: Restore workspace file by revision id
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/FileId'
+        - $ref: '#/components/parameters/RevisionId'
+      responses:
+        '201':
+          description: Restored workspace file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceFileResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
   /api/workspaces/{workspaceId}/files/{fileId}/move:
     patch:
       summary: Move workspace file/folder to target path
@@ -328,6 +359,13 @@ components:
       schema:
         type: string
         format: uuid
+    RevisionId:
+      name: revisionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
   responses:
     ValidationError:
       description: Validation failed
@@ -410,6 +448,31 @@ components:
           type: string
           format: date-time
       required: [id, workspaceId, name, path, language, content, tags, starred, kind, order, createdAt, updatedAt]
+    WorkspaceFileRevision:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        workspaceId:
+          type: string
+          format: uuid
+        fileId:
+          type: string
+          format: uuid
+        language:
+          type: string
+        content:
+          type: string
+        source:
+          type: string
+          enum: [update, restore]
+        summary:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, workspaceId, fileId, language, content, source, summary, createdAt]
     CreateWorkspaceInput:
       type: object
       properties:
@@ -586,6 +649,18 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/WorkspaceFile'
+          required: [items]
+      required: [data]
+    WorkspaceFileRevisionListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/WorkspaceFileRevision'
           required: [items]
       required: [data]
     SearchSnippetListResponse:

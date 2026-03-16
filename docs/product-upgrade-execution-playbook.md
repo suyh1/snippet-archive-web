@@ -233,7 +233,7 @@
 
 1. 线程 A：搜索中心与搜索 API（✅ 已完成）。
 2. 线程 B：标签与收藏（✅ 已完成）。
-3. 线程 C：revision 后端模型 + API（未开始）。
+3. 线程 C：revision 后端模型 + API（✅ 已完成）。
 4. 线程 D：revision 前端面板 + 回滚（未开始）。
 5. 线程 E：前端路由与 store 解耦（未开始）。
 6. 线程 F：账号与组织基础（未开始）。
@@ -375,6 +375,21 @@ A6 完成标记：
    - `npm run typecheck --workspace @snippet-archive/frontend`
    - `npm run build`
 
+### 2026-03-16｜线程 C（完成）
+
+1. 目标：完成“revision 后端模型 + API（列表/回滚）”并通过门禁。
+2. 结果：
+   - 数据层：新增 `WorkspaceFileRevision` 模型，建立 `WorkspaceFile` 关联与索引（`fileId + createdAt`、`workspaceId + fileId + createdAt`）。
+   - 后端：新增 revision 列表接口与回滚接口；文件保存时（content/language 变化）自动写入 revision；回滚后追加 `restore` 来源 revision。
+   - 文档：OpenAPI 同步 revision 路由、参数与 schema。
+3. 验证命令（均通过）：
+   - `npm run test --workspace @snippet-archive/backend`
+   - `npm run test:e2e --workspace @snippet-archive/backend`
+   - `npm run test:run --workspace @snippet-archive/frontend`
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
+   - `npm run typecheck --workspace @snippet-archive/frontend`
+   - `npm run build`
+
 ## 12. 阶段一执行细化（线程 B：标签与收藏）
 
 ### 12.1 线程目标
@@ -417,4 +432,44 @@ B5 完成标记：
 ### 12.3 线程 B 当前状态
 
 1. 当前状态：✅ 已完成（线程 B 全部验收通过）。
+2. 当前阻塞：无。
+
+## 13. 阶段一执行细化（线程 C：revision 后端模型 + API）
+
+### 13.1 线程目标
+
+1. 引入持久化 revision 数据模型，建立文件历史版本基础能力。
+2. 提供 revision 列表接口与指定版本回滚接口。
+3. 保证文件保存后会产生可追溯 revision 记录。
+
+### 13.2 线程 C 小功能点清单（逐项打标）
+
+C0 文档与状态：
+- [x] C0-1：在线程总览中将线程 C 状态标记为“进行中”。
+- [x] C0-2：在本文件追加线程 C 细化清单与执行记录。
+
+C1 数据模型与索引：
+- [x] C1-1：新增 `WorkspaceFileRevision` 数据模型（关联 `WorkspaceFile`）。
+- [x] C1-2：为 revision 列表查询补充索引（`fileId + createdAt`）。
+
+C2 后端 API 与服务：
+- [x] C2-1：新增 revision 列表接口 `GET /api/workspaces/:workspaceId/files/:fileId/revisions`。
+- [x] C2-2：新增 revision 回滚接口 `POST /api/workspaces/:workspaceId/files/:fileId/revisions/:revisionId/restore`。
+- [x] C2-3：在文件保存链路中创建 revision 记录（至少覆盖 content/language 变更）。
+
+C3 测试与文档：
+- [x] C3-1：新增后端 e2e 回归测试并执行 RED->GREEN。
+- [x] C3-2：更新 OpenAPI（revision 路由 + schema）。
+
+C4 验证门禁：
+- [x] C4-1：targeted 回归（backend test + e2e）通过。
+- [x] C4-2：full gate（frontend/backend test、typecheck、build）通过。
+
+C5 完成标记：
+- [x] C5-1：线程清单将“线程 C”标记为已完成。
+- [x] C5-2：追加线程 C 完成执行记录与命令证据。
+
+### 13.3 线程 C 当前状态
+
+1. 当前状态：✅ 已完成（线程 C 全部验收通过）。
 2. 当前阻塞：无。

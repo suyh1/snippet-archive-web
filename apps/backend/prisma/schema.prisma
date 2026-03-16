@@ -33,10 +33,26 @@ model WorkspaceFile {
   order       Int
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  revisions   WorkspaceFileRevision[]
 
   @@index([workspaceId])
   @@index([workspaceId, path])
   @@index([workspaceId, language])
   @@index([workspaceId, updatedAt])
   @@index([workspaceId, starred])
+}
+
+model WorkspaceFileRevision {
+  id          String        @id @default(uuid())
+  workspaceId String
+  fileId      String
+  file        WorkspaceFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  language    String
+  content     String
+  source      String
+  summary     String        @default("")
+  createdAt   DateTime      @default(now())
+
+  @@index([fileId, createdAt])
+  @@index([workspaceId, fileId, createdAt])
 }

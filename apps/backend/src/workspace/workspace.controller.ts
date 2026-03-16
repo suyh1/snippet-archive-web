@@ -97,6 +97,34 @@ export class WorkspaceController {
     return { data: file }
   }
 
+  @Get(':workspaceId/files/:fileId/revisions')
+  async listWorkspaceFileRevisions(
+    @Param('workspaceId', new ParseUUIDPipe()) workspaceId: string,
+    @Param('fileId', new ParseUUIDPipe()) fileId: string,
+  ) {
+    const items = await this.workspaceService.listWorkspaceFileRevisions(
+      workspaceId,
+      fileId,
+    )
+
+    return { data: { items } }
+  }
+
+  @Post(':workspaceId/files/:fileId/revisions/:revisionId/restore')
+  async restoreWorkspaceFileRevision(
+    @Param('workspaceId', new ParseUUIDPipe()) workspaceId: string,
+    @Param('fileId', new ParseUUIDPipe()) fileId: string,
+    @Param('revisionId', new ParseUUIDPipe()) revisionId: string,
+  ) {
+    const file = await this.workspaceService.restoreWorkspaceFileRevision(
+      workspaceId,
+      fileId,
+      revisionId,
+    )
+
+    return { data: file }
+  }
+
   @Patch(':workspaceId/files/:fileId/move')
   async moveWorkspaceFile(
     @Param('workspaceId', new ParseUUIDPipe()) workspaceId: string,

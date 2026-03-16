@@ -5,13 +5,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
+import { Prisma, WorkspaceFile } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateWorkspaceDto } from './dto/create-workspace.dto'
 import { CreateWorkspaceFileDto } from './dto/create-workspace-file.dto'
 import { MoveWorkspaceFileDto } from './dto/move-workspace-file.dto'
 import { UpdateWorkspaceDto } from './dto/update-workspace.dto'
 import { UpdateWorkspaceFileDto } from './dto/update-workspace-file.dto'
+
+type RevisionSource = 'update' | 'restore'
 
 @Injectable()
 export class WorkspaceService {
@@ -112,9 +114,10 @@ export class WorkspaceService {
     fileId: string,
     dto: UpdateWorkspaceFileDto,
   ) {
-    await this.getWorkspaceFile(workspaceId, fileId)
+    const currentFile = await this.getWorkspaceFile(workspaceId, fileId)
 
     const data: UpdateWorkspaceFileDto = { ...dto }
+    const shouldTrackRevision = this.shouldTrackRevisionForUpdate(currentFile, dto)
 
     if (dto.path !== undefined) {
       const normalizedPath = this.normalizePath(dto.path)
@@ -129,7 +132,58 @@ export class WorkspaceService {
     })
 
     await this.normalizeWorkspaceOrders(workspaceId)
-    return this.getWorkspaceFile(workspaceId, fileId)
+    const updatedFile = await this.getWorkspaceFile(workspaceId, fileId)
+
+    if (shouldTrackRevision) {
+      await this.createRevisionSnapshot(this.prisma, updatedFile, 'update')
+    }
+
+    return updatedFile
+  }
+
+  async listWorkspaceFileRevisions(workspaceId: string, fileId: string) {
+    await this.getWorkspaceFile(workspaceId, fileId)
+
+    return this.prisma.workspaceFileRevision.findMany({
+      where: {
+        workspaceId,
+        fileId,
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    })
+  }
+
+  async restoreWorkspaceFileRevision(
+    workspaceId: string,
+    fileId: string,
+    revisionId: string,
+  ) {
+    await this.getWorkspaceFile(workspaceId, fileId)
+
+    const revision = await this.prisma.workspaceFileRevision.findFirst({
+      where: {
+        id: revisionId,
+        workspaceId,
+        fileId,
+      },
+    })
+
+    if (!revision) {
+      throw new NotFoundException('Workspace file revision not found')
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const restoredFile = await tx.workspaceFile.update({
+        where: { id: fileId },
+        data: {
+          content: revision.content,
+          language: revision.language,
+        },
+      })
+
+      await this.createRevisionSnapshot(tx, restoredFile, 'restore')
+      return restoredFile
+    })
   }
 
   async moveWorkspaceFile(
@@ -311,6 +365,50 @@ export class WorkspaceService {
     }
 
     return normalized.slice(0, lastSlash)
+  }
+
+  private shouldTrackRevisionForUpdate(
+    file: WorkspaceFile,
+    dto: UpdateWorkspaceFileDto,
+  ) {
+    if (file.kind !== 'file') {
+      return false
+    }
+
+    const nextContent = dto.content ?? file.content
+    const nextLanguage = dto.language ?? file.language
+
+    return nextContent !== file.content || nextLanguage !== file.language
+  }
+
+  private async createRevisionSnapshot(
+    client: PrismaService | Prisma.TransactionClient,
+    file: Pick<WorkspaceFile, 'id' | 'workspaceId' | 'language' | 'content'>,
+    source: RevisionSource,
+  ) {
+    await client.workspaceFileRevision.create({
+      data: {
+        workspaceId: file.workspaceId,
+        fileId: file.id,
+        language: file.language,
+        content: file.content,
+        source,
+        summary: this.buildRevisionSummary(file.content, source),
+      },
+    })
+  }
+
+  private buildRevisionSummary(content: string, source: RevisionSource) {
+    const firstLine = content.split('\n')[0]?.trim() || ''
+    const preview = firstLine.slice(0, 80)
+
+    if (preview.length === 0) {
+      return source === 'restore' ? 'Restored empty content' : 'Updated empty content'
+    }
+
+    return source === 'restore'
+      ? `Restored: ${preview}`
+      : `Updated: ${preview}`
   }
 
   private async normalizeWorkspaceOrders(workspaceId: string) {
