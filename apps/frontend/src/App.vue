@@ -117,7 +117,15 @@ const statusLanguageLabel = computed(() => {
 })
 type AppView = 'workspace' | 'settings'
 type SettingsTab = 'general' | 'themes' | 'languages'
-const currentView = ref<AppView>('workspace')
+const props = withDefaults(
+  defineProps<{
+    initialView?: AppView
+  }>(),
+  {
+    initialView: 'workspace',
+  },
+)
+const currentView = ref<AppView>(props.initialView)
 const settingsTab = ref<SettingsTab>('languages')
 const languageSearchQuery = ref('')
 const isSettingsView = computed(() => currentView.value === 'settings')
@@ -339,6 +347,18 @@ onMounted(async () => {
   }
 
   await workspaceStore.loadWorkspaces()
+
+  const params = new URLSearchParams(window.location.search)
+  const workspaceId = params.get('workspaceId')
+  const fileId = params.get('fileId')
+
+  if (workspaceId) {
+    await workspaceStore.openWorkspace(workspaceId)
+  }
+
+  if (fileId && workspaceStore.files.some((item) => item.id === fileId)) {
+    workspaceStore.selectFile(fileId)
+  }
 })
 
 watch(editorTheme, (theme) => {
@@ -1245,7 +1265,8 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .app-shell {
-  height: 100vh;
+  height: 100%;
+  min-height: 0;
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
   font-family: var(--theme-layout-app-font-family);

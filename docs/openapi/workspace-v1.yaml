@@ -211,6 +211,67 @@ paths:
           $ref: '#/components/responses/NotFoundError'
         '409':
           $ref: '#/components/responses/ConflictError'
+  /api/search/snippets:
+    get:
+      summary: Search snippets
+      parameters:
+        - name: keyword
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: language
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: tag
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: workspaceId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: updatedFrom
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: updatedTo
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Search result list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchSnippetListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
 components:
   parameters:
     WorkspaceId:
@@ -291,12 +352,22 @@ components:
           type: string
         content:
           type: string
+        tags:
+          type: array
+          items:
+            type: string
         kind:
           type: string
           enum: [file, folder]
         order:
           type: integer
-      required: [id, workspaceId, name, path, language, content, kind, order]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, workspaceId, name, path, language, content, tags, kind, order, createdAt, updatedAt]
     CreateWorkspaceInput:
       type: object
       properties:
@@ -340,6 +411,10 @@ components:
           enum: [file, folder]
         order:
           type: integer
+        tags:
+          type: array
+          items:
+            type: string
       required: [name, path, language, kind, order]
     UpdateWorkspaceFileInput:
       type: object
@@ -357,6 +432,54 @@ components:
           enum: [file, folder]
         order:
           type: integer
+        tags:
+          type: array
+          items:
+            type: string
+    SearchSnippet:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        workspaceId:
+          type: string
+          format: uuid
+        workspaceTitle:
+          type: string
+        workspaceTags:
+          type: array
+          items:
+            type: string
+        workspaceStarred:
+          type: boolean
+        name:
+          type: string
+        path:
+          type: string
+        language:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        content:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - workspaceId
+        - workspaceTitle
+        - workspaceTags
+        - workspaceStarred
+        - name
+        - path
+        - language
+        - tags
+        - content
+        - updatedAt
     MoveWorkspaceFileInput:
       type: object
       properties:
@@ -418,6 +541,24 @@ components:
               items:
                 $ref: '#/components/schemas/WorkspaceFile'
           required: [items]
+      required: [data]
+    SearchSnippetListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/SearchSnippet'
+            total:
+              type: integer
+            page:
+              type: integer
+            pageSize:
+              type: integer
+          required: [items, total, page, pageSize]
       required: [data]
     DeleteIdResponse:
       type: object

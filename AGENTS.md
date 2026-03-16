@@ -6,7 +6,7 @@
 
 1. [TESTING.md](./TESTING.md)  
    说明统一测试与验证流程（交互流、几何断言、门禁命令、汇报要求）。
-2. [2026-03-16-product-upgrade-execution-playbook.md](./docs/2026-03-16-product-upgrade-execution-playbook.md)  
+2. [product-upgrade-execution-playbook.md](./docs/product-upgrade-execution-playbook.md)  
    说明产品三阶段升级路线、技术改造重点、线程拆分顺序与里程碑指标。
 
 ## 本仓库约束

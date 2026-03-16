@@ -16,8 +16,11 @@ export type WorkspaceFile = {
   path: string
   language: string
   content: string
+  tags?: string[]
   kind: string
   order: number
+  createdAt?: string
+  updatedAt?: string
 }
 
 export type CreateWorkspaceInput = {
@@ -39,6 +42,38 @@ export type CreateWorkspaceFileInput = {
 export type MoveWorkspaceFileInput = {
   targetPath: string
   targetOrder?: number
+}
+
+export type SearchSnippet = {
+  id: string
+  workspaceId: string
+  workspaceTitle: string
+  workspaceTags: string[]
+  workspaceStarred: boolean
+  name: string
+  path: string
+  language: string
+  tags: string[]
+  content: string
+  updatedAt: string
+}
+
+export type SearchSnippetsInput = {
+  keyword?: string
+  language?: string
+  tag?: string
+  workspaceId?: string
+  updatedFrom?: string
+  updatedTo?: string
+  page?: number
+  pageSize?: number
+}
+
+export type SearchSnippetsResult = {
+  items: SearchSnippet[]
+  total: number
+  page: number
+  pageSize: number
 }
 
 export type EditorSnapshotSource = 'manual' | 'format'

@@ -149,6 +149,7 @@ describe('WorkspaceService', () => {
         path: '/src/main.ts',
         language: 'typescript',
         content: '',
+        tags: [],
         kind: 'file',
         order: 3,
       },

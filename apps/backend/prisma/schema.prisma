@@ -27,9 +27,14 @@ model WorkspaceFile {
   path        String
   language    String
   content     String    @default("")
+  tags        String[]  @default([])
   kind        String
   order       Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([workspaceId])
   @@index([workspaceId, path])
+  @@index([workspaceId, language])
+  @@index([workspaceId, updatedAt])
 }

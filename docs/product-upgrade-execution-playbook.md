@@ -1,4 +1,4 @@
-# Snippet Archive Web 产品升级执行方案（2026-03-16）
+# Snippet Archive Web 产品升级执行方案
 
 > 目标：把当前“可编辑的个人代码片段仓库”升级为“可沉淀、可检索、可协作、可扩展的工程化产品”。
 > 适用方式：可直接按本文拆分新线程执行。
@@ -231,16 +231,16 @@
 
 推荐线程切分顺序：
 
-1. 线程 A：搜索中心与搜索 API。
-2. 线程 B：标签与收藏。
-3. 线程 C：revision 后端模型 + API。
-4. 线程 D：revision 前端面板 + 回滚。
-5. 线程 E：前端路由与 store 解耦。
-6. 线程 F：账号与组织基础。
-7. 线程 G：权限与分享链接。
-8. 线程 H：审计日志与管理页面。
-9. 线程 I：VS Code 插件 PoC。
-10. 线程 J：CLI + 导入导出协议。
+1. 线程 A：搜索中心与搜索 API（✅ 已完成）。
+2. 线程 B：标签与收藏（未开始）。
+3. 线程 C：revision 后端模型 + API（未开始）。
+4. 线程 D：revision 前端面板 + 回滚（未开始）。
+5. 线程 E：前端路由与 store 解耦（未开始）。
+6. 线程 F：账号与组织基础（未开始）。
+7. 线程 G：权限与分享链接（未开始）。
+8. 线程 H：审计日志与管理页面（未开始）。
+9. 线程 I：VS Code 插件 PoC（未开始）。
+10. 线程 J：CLI + 导入导出协议（未开始）。
 
 ## 6. 里程碑与指标
 
@@ -277,3 +277,85 @@
 1. 本文件作为“主路线图”，后续只增量更新，不拆散为大量历史计划。
 2. 每个新线程完成后，在本文件追加“执行记录”小节（日期/目标/结果/待办）。
 3. 所有已过时计划文档不再保留，避免上下文噪声。
+
+## 9. 执行与追踪规则（新增）
+
+1. 计划细化统一维护在本文件中，不再拆分到独立计划文档；新线程的详细步骤直接追加到对应线程小节。
+2. 每个功能/线程完成后，必须在本文件对应条目显式标记“已完成”（例如在线程清单中标注 `✅`）。
+3. 标记完成的同一次提交中，必须追加执行记录（日期、目标、结果、验证命令与结论），保证“任务状态”与“证据”同步更新。
+
+## 10. 阶段一执行细化（线程 A：搜索中心与搜索 API）
+
+### 10.1 线程目标
+
+1. 交付可用的搜索中心（关键词 + 过滤 + 分页 + 视图预设）。
+2. 新增后端搜索接口 `GET /api/search/snippets`。
+3. 前端入口升级为路由级页面：`/workspace`、`/search`、`/settings`。
+
+### 10.2 线程 A 小功能点清单（逐项打标）
+
+A0 文档治理：
+- [x] A0-1：将升级执行文档文件名去日期化（`product-upgrade-execution-playbook.md`）。
+- [x] A0-2：明确“计划细化只在本文件维护，不拆分独立计划文档”。
+- [x] A0-3：线程状态改为“进行中/未开始/已完成”可追踪。
+
+A1 后端搜索接口：
+- [x] A1-1：新增搜索 e2e 回归测试（先红）。
+- [x] A1-2：实现 `GET /api/search/snippets`（关键词、过滤、分页）。
+- [x] A1-3：补充 OpenAPI 文档与必要单测/e2e。
+
+A2 数据层搜索准备：
+- [x] A2-1：`WorkspaceFile` 增加 `tags` 字段。
+- [x] A2-2：`WorkspaceFile` 增加 `createdAt/updatedAt`。
+- [x] A2-3：补充搜索相关索引策略。
+
+A3 前端搜索中心：
+- [x] A3-1：新增 `searchStore` 与搜索 API 客户端。
+- [x] A3-2：新增 `SearchPage`（click/keyboard/focus-blur/state）。
+- [x] A3-3：支持保存搜索条件（视图预设）。
+
+A4 路由级页面落地：
+- [x] A4-1：主入口切换到路由壳层。
+- [x] A4-2：补齐 `/workspace`、`/search`、`/settings` 页面路由。
+
+A5 验证门禁：
+- [x] A5-1：targeted 回归（backend + frontend + e2e）通过。
+- [x] A5-2：full gate（test/typecheck/build）通过。
+
+A6 完成标记：
+- [x] A6-1：线程清单将“线程 A”标记为已完成。
+- [x] A6-2：追加执行记录并附完整命令结果结论。
+
+### 10.3 线程 A 当前状态
+
+1. 当前状态：✅ 已完成（线程 A 全部验收通过）。
+2. 当前阻塞：无。
+
+## 11. 执行记录
+
+### 2026-03-16｜线程 A（阶段初始化）
+
+1. 目标：统一执行文档入口与追踪机制，启动线程 A。
+2. 结果：
+   - 已完成 A0-1 / A0-2 / A0-3。
+   - 后端搜索接口 RED 回归测试已新增（待 GREEN）。
+3. 证据：
+   - 文档文件已重命名为 `docs/product-upgrade-execution-playbook.md`。
+   - `AGENTS.md` 已更新文档入口引用。
+   - `apps/backend/test/search.e2e-spec.ts` 已创建并验证 RED。
+
+### 2026-03-16｜线程 A（完成）
+
+1. 目标：完成“搜索中心 + 搜索 API + 路由级页面入口”并通过门禁。
+2. 结果：
+   - 后端：新增搜索模块与接口，支持关键词/过滤/分页。
+   - 数据层：`WorkspaceFile` 新增 `tags`、`createdAt`、`updatedAt` 与索引。
+   - 前端：新增 `SearchPage`、`searchStore`、路由壳层与三页面路由。
+   - 文档：OpenAPI 与升级执行文档状态同步更新。
+3. 验证命令（均通过）：
+   - `npm run test --workspace @snippet-archive/backend`
+   - `npm run test:e2e --workspace @snippet-archive/backend`
+   - `npm run test:run --workspace @snippet-archive/frontend`
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
+   - `npm run typecheck --workspace @snippet-archive/frontend`
+   - `npm run build`

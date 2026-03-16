@@ -1,4 +1,11 @@
-import { IsInt, IsOptional, IsString, Min } from 'class-validator'
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator'
 
 export class UpdateWorkspaceFileDto {
   @IsOptional()
@@ -25,4 +32,10 @@ export class UpdateWorkspaceFileDto {
   @IsInt()
   @Min(0)
   order?: number
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  tags?: string[]
 }

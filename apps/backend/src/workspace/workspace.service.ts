@@ -96,6 +96,7 @@ export class WorkspaceService {
         path: normalizedPath,
         language: dto.language,
         content: dto.content ?? '',
+        tags: dto.tags ?? [],
         kind: dto.kind,
         order: dto.order,
       },
