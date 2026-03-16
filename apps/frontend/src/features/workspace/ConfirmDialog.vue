@@ -48,33 +48,33 @@ const emit = defineEmits<{
 .dialog-mask {
   position: fixed;
   inset: 0;
-  background: rgba(7, 11, 28, 0.45);
+  background: var(--theme-surface-overlay-background);
   display: grid;
   place-items: center;
-  backdrop-filter: blur(8px);
+  backdrop-filter: var(--theme-surface-overlay-blur);
   z-index: 61;
 }
 
 .dialog-panel {
   width: min(460px, calc(100vw - 24px));
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.7), rgba(226, 247, 255, 0.55));
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: var(--theme-surface-glass-card-background);
+  border: 1px solid var(--theme-surface-glass-panel-border);
   border-radius: 18px;
   padding: 18px;
   display: grid;
   gap: 12px;
-  box-shadow: 0 22px 44px rgba(15, 23, 42, 0.2);
+  box-shadow: var(--theme-surface-glass-panel-shadow);
 }
 
 .dialog-panel h3 {
   margin: 0;
   font-size: 18px;
-  color: #0f172a;
+  color: var(--theme-text-primary);
 }
 
 .dialog-panel p {
   margin: 0;
-  color: #475569;
+  color: var(--theme-text-tertiary);
   line-height: 1.6;
 }
 
@@ -85,23 +85,23 @@ const emit = defineEmits<{
 }
 
 .dialog-actions button {
-  border: 1px solid rgba(148, 163, 184, 0.5);
-  background: rgba(255, 255, 255, 0.82);
-  color: #0f172a;
+  border: 1px solid var(--theme-surface-neutral-button-border);
+  background: var(--theme-surface-input-background);
+  color: var(--theme-text-primary);
   border-radius: 10px;
   padding: 8px 12px;
   cursor: pointer;
 }
 
 .dialog-actions .confirm-button {
-  border-color: rgba(14, 165, 233, 0.75);
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.9), rgba(56, 189, 248, 0.84));
-  color: #f8fafc;
+  border-color: var(--theme-accent-primary-button-border);
+  background: var(--theme-accent-primary-button-gradient);
+  color: var(--theme-accent-primary-button-text);
 }
 
 .dialog-actions .confirm-button.danger {
-  border-color: rgba(248, 113, 113, 0.75);
-  background: linear-gradient(135deg, rgba(220, 38, 38, 0.92), rgba(248, 113, 113, 0.86));
+  border-color: var(--theme-danger-strong-border);
+  background: var(--theme-danger-strong-gradient);
 }
 
 .dialog-actions button:disabled {

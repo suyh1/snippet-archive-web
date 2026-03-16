@@ -26,6 +26,7 @@ describe('App settings page', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     window.location.hash = '#/'
+    window.localStorage.clear()
     vi.mocked(workspaceApi.list).mockResolvedValue([])
   })
 
@@ -59,5 +60,79 @@ describe('App settings page', () => {
 
     await wrapper.get('[data-testid="back-to-workspace"]').trigger('click')
     expect(wrapper.find('[data-testid="settings-view"]').exists()).toBe(false)
+  })
+
+  it('imports and exports theme files in general tab', async () => {
+    const createObjectUrlSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:theme-export')
+    const revokeObjectUrlSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const anchorClickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => {})
+
+    const pinia = createPinia()
+    setActivePinia(pinia)
+
+    const wrapper = mount(App, {
+      global: {
+        plugins: [pinia],
+      },
+    })
+
+    await wrapper.get('[data-testid="open-settings"]').trigger('click')
+    await wrapper.get('[data-testid="settings-tab-general"]').trigger('click')
+    await vi.waitFor(() => {
+      expect(wrapper.find('[data-testid="settings-theme-panel"]').exists()).toBe(true)
+    })
+
+    const presetSelect = wrapper.get('[data-testid="settings-theme-preset-select"]')
+    expect((presetSelect.element as HTMLSelectElement).options.length).toBeGreaterThanOrEqual(9)
+    await presetSelect.setValue('graphite-pro')
+    await wrapper.get('[data-testid="settings-theme-apply-preset"]').trigger('click')
+    expect(wrapper.get('[data-testid="settings-theme-current-id"]').text()).toBe('graphite-pro')
+
+    const fileNameInput = wrapper.get('[data-testid="settings-theme-export-name"]')
+    await fileNameInput.setValue('  custom-glass  ')
+    await fileNameInput.trigger('blur')
+    expect((fileNameInput.element as HTMLInputElement).value).toBe('custom-glass')
+
+    await fileNameInput.setValue('temporary-value')
+    await fileNameInput.trigger('keydown', { key: 'Escape' })
+    expect((fileNameInput.element as HTMLInputElement).value).toBe('graphite-pro')
+
+    await wrapper.get('[data-testid="settings-theme-export"]').trigger('click')
+    expect(createObjectUrlSpy).toHaveBeenCalledTimes(1)
+    expect(anchorClickSpy).toHaveBeenCalledTimes(1)
+    expect(revokeObjectUrlSpy).toHaveBeenCalledWith('blob:theme-export')
+
+    const exportBlob = createObjectUrlSpy.mock.calls[0][0] as Blob
+    const exportedTheme = JSON.parse(await exportBlob.text()) as {
+      modules: {
+        layout: {
+          appShellBackground: string
+        }
+      }
+    }
+    exportedTheme.modules.layout.appShellBackground =
+      'linear-gradient(160deg, #fee2e2 0%, #fecaca 52%, #fda4af 100%)'
+
+    const input = wrapper.get('[data-testid="settings-theme-import-input"]')
+    const file = new File([JSON.stringify(exportedTheme, null, 2)], 'custom-glass.json', {
+      type: 'application/json',
+    })
+    Object.defineProperty(input.element, 'files', {
+      configurable: true,
+      value: [file],
+    })
+    await input.trigger('change')
+
+    await vi.waitFor(() => {
+      expect(wrapper.get('[data-testid="settings-theme-import-message"]').text()).toContain(
+        '主题已导入并应用',
+      )
+    })
+
+    expect(document.documentElement.style.getPropertyValue('--theme-layout-app-shell-background')).toBe(
+      'linear-gradient(160deg, #fee2e2 0%, #fecaca 52%, #fda4af 100%)',
+    )
   })
 })

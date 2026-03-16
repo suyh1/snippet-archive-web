@@ -104,8 +104,8 @@ function formatTime(timestamp: number) {
   z-index: 70;
   display: grid;
   place-items: center;
-  background: rgba(15, 23, 42, 0.42);
-  backdrop-filter: blur(4px);
+  background: var(--theme-surface-overlay-strong-background);
+  backdrop-filter: var(--theme-surface-overlay-soft-blur);
 }
 
 .snapshot-card {
@@ -114,9 +114,9 @@ function formatTime(timestamp: number) {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  background: linear-gradient(140deg, rgba(255, 255, 255, 0.9), rgba(226, 232, 240, 0.84));
-  box-shadow: 0 26px 54px rgba(15, 23, 42, 0.25);
+  border: 1px solid var(--theme-surface-glass-panel-border);
+  background: var(--theme-surface-glass-card-background);
+  box-shadow: var(--theme-surface-glass-panel-shadow);
   overflow: hidden;
 }
 
@@ -126,18 +126,18 @@ function formatTime(timestamp: number) {
   align-items: flex-start;
   gap: 12px;
   padding: 14px 16px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.32);
+  border-bottom: 1px solid var(--theme-surface-statusbar-border);
 }
 
 .snapshot-head h3 {
   margin: 0;
   font-size: 18px;
-  color: #0f172a;
+  color: var(--theme-text-primary);
 }
 
 .snapshot-head p {
   margin: 4px 0 0;
-  color: #475569;
+  color: var(--theme-text-tertiary);
   font-size: 12px;
 }
 
@@ -154,15 +154,15 @@ function formatTime(timestamp: number) {
 }
 
 .snapshot-actions .primary {
-  border: 1px solid rgba(14, 165, 233, 0.52);
-  background: linear-gradient(130deg, rgba(14, 165, 233, 0.88), rgba(56, 189, 248, 0.78));
-  color: #f8fafc;
+  border: 1px solid var(--theme-accent-primary-button-border);
+  background: var(--theme-accent-primary-button-gradient);
+  color: var(--theme-accent-primary-button-text);
 }
 
 .snapshot-actions .ghost {
-  border: 1px solid rgba(148, 163, 184, 0.55);
-  background: rgba(248, 250, 252, 0.72);
-  color: #0f172a;
+  border: 1px solid var(--theme-surface-neutral-button-border);
+  background: var(--theme-surface-neutral-button-background);
+  color: var(--theme-text-primary);
 }
 
 .snapshot-list {
@@ -181,8 +181,8 @@ function formatTime(timestamp: number) {
   gap: 12px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  background: rgba(248, 250, 252, 0.7);
+  border: 1px solid var(--theme-surface-neutral-button-border);
+  background: var(--theme-surface-neutral-button-background);
 }
 
 .snapshot-item .meta {
@@ -193,18 +193,18 @@ function formatTime(timestamp: number) {
 
 .snapshot-item strong {
   font-size: 13px;
-  color: #0f172a;
+  color: var(--theme-text-primary);
 }
 
 .snapshot-item span {
   font-size: 12px;
-  color: #475569;
+  color: var(--theme-text-tertiary);
 }
 
 .snapshot-item button {
-  border: 1px solid rgba(56, 189, 248, 0.58);
-  background: rgba(14, 165, 233, 0.16);
-  color: #0f172a;
+  border: 1px solid var(--theme-accent-row-action-border);
+  background: var(--theme-accent-row-action-background);
+  color: var(--theme-accent-row-action-text);
   border-radius: 8px;
   padding: 6px 10px;
   font-weight: 600;
@@ -219,8 +219,7 @@ function formatTime(timestamp: number) {
 .snapshot-empty {
   margin: 0;
   padding: 20px 16px;
-  color: #475569;
+  color: var(--theme-text-tertiary);
   font-size: 13px;
 }
 </style>
-

@@ -1,9 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  font-family: "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif;
-  color: #0f172a;
-  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+  font-family: var(
+    --theme-layout-app-font-family,
+    "Segoe UI",
+    "PingFang SC",
+    "Hiragino Sans GB",
+    sans-serif
+  );
+  color: var(--theme-text-primary, #0f172a);
+  background: var(--theme-layout-body-background, linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%));
 }
 
 * {
@@ -18,4 +24,6 @@ body,
 
 body {
   margin: 0;
+  color: var(--theme-text-primary, #0f172a);
+  background: var(--theme-layout-body-background, linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%));
 }

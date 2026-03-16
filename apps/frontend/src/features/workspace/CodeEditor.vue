@@ -384,7 +384,7 @@ onBeforeUnmount(() => {
 }
 
 :deep(.cm-gutters) {
-  backdrop-filter: blur(8px);
+  backdrop-filter: var(--theme-surface-overlay-blur);
 }
 
 :deep(.cm-content) {

@@ -910,11 +910,11 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .file-tree {
-  border: 1px solid rgba(255, 255, 255, 0.65);
+  border: 1px solid var(--theme-surface-glass-panel-border);
   border-radius: 16px;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.64), rgba(224, 242, 254, 0.4));
-  backdrop-filter: blur(12px);
-  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.09);
+  background: var(--theme-surface-glass-card-background);
+  backdrop-filter: var(--theme-surface-overlay-blur);
+  box-shadow: var(--theme-surface-glass-panel-shadow);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -927,14 +927,14 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   padding: 12px 14px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.28);
-  background: linear-gradient(120deg, rgba(219, 234, 254, 0.58), rgba(186, 230, 253, 0.3));
+  border-bottom: 1px solid var(--theme-surface-statusbar-border);
+  background: var(--theme-surface-glass-header-background);
 }
 
 .tree-header h3 {
   margin: 0;
   font-size: 16px;
-  color: #0f172a;
+  color: var(--theme-text-primary);
 }
 
 .tree-actions {
@@ -943,40 +943,40 @@ onBeforeUnmount(() => {
 }
 
 .tree-actions button {
-  border: 1px solid rgba(148, 163, 184, 0.48);
+  border: 1px solid var(--theme-accent-action-button-border);
   border-radius: 9px;
-  background: rgba(255, 255, 255, 0.74);
+  background: var(--theme-surface-neutral-button-background);
   padding: 6px 10px;
   cursor: pointer;
-  color: #0f172a;
+  color: var(--theme-text-primary);
   font-weight: 600;
 }
 
 .root-dropzone {
   margin: 10px;
-  border: 1px dashed rgba(14, 165, 233, 0.75);
+  border: 1px dashed var(--theme-accent-primary-button-border);
   border-radius: 10px;
-  color: #0c4a6e;
+  color: var(--theme-accent-selected-text);
   font-size: 13px;
   padding: 8px;
   text-align: center;
-  background: rgba(224, 242, 254, 0.45);
+  background: var(--theme-surface-root-dropzone-background);
 }
 
 .root-dropzone.active {
-  border-color: #0284c7;
-  background: rgba(186, 230, 253, 0.6);
+  border-color: var(--theme-accent-selected-border);
+  background: var(--theme-surface-root-dropzone-active-background);
 }
 
 .root-dropzone.invalid {
-  border-color: #ef4444;
-  background: rgba(254, 226, 226, 0.66);
-  color: #991b1b;
+  border-color: var(--theme-danger-strong-border);
+  background: var(--theme-surface-root-dropzone-invalid-background);
+  color: var(--theme-danger-soft-text);
 }
 
 .drop-message {
   margin: 0 10px 8px;
-  color: #991b1b;
+  color: var(--theme-danger-soft-text);
   font-size: 12px;
 }
 
@@ -994,28 +994,28 @@ onBeforeUnmount(() => {
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 8px;
-  border-top: 1px solid rgba(226, 232, 240, 0.72);
+  border-top: 1px solid var(--theme-surface-row-border);
   padding: 6px 10px;
 }
 
 .row.active {
-  background: rgba(186, 230, 253, 0.55);
+  background: var(--theme-surface-row-active-background);
 }
 
 .row.draft {
-  background: rgba(240, 249, 255, 0.82);
+  background: var(--theme-surface-row-draft-background);
 }
 
 .row.rename-draft {
-  background: rgba(236, 254, 255, 0.85);
+  background: var(--theme-surface-row-rename-background);
 }
 
 .row.drop-active {
-  background: rgba(191, 219, 254, 0.56);
+  background: var(--theme-surface-row-drop-active-background);
 }
 
 .row.drop-invalid {
-  background: rgba(254, 226, 226, 0.66);
+  background: var(--theme-surface-row-drop-invalid-background);
 }
 
 .row-main {
@@ -1032,10 +1032,10 @@ onBeforeUnmount(() => {
 .folder-toggle {
   width: 24px;
   height: 24px;
-  border: 1px solid rgba(148, 163, 184, 0.45);
+  border: 1px solid var(--theme-surface-neutral-button-border);
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.7);
-  color: #0f172a;
+  background: var(--theme-surface-neutral-button-background);
+  color: var(--theme-text-primary);
   cursor: pointer;
   padding: 0;
   line-height: 1;
@@ -1064,11 +1064,11 @@ onBeforeUnmount(() => {
 .draft-input {
   flex: 1;
   min-width: 120px;
-  border: 1px solid rgba(14, 165, 233, 0.45);
+  border: 1px solid var(--theme-accent-primary-button-border);
   border-radius: 8px;
   padding: 5px 8px;
-  background: rgba(255, 255, 255, 0.82);
-  color: #0f172a;
+  background: var(--theme-surface-input-background);
+  color: var(--theme-text-primary);
   font-size: 13px;
 }
 
@@ -1079,11 +1079,11 @@ onBeforeUnmount(() => {
 
 .name {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--theme-text-primary);
 }
 
 .meta {
-  color: #475569;
+  color: var(--theme-text-tertiary);
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1098,29 +1098,29 @@ onBeforeUnmount(() => {
 }
 
 .row-actions button {
-  border: 1px solid rgba(148, 163, 184, 0.45);
-  background: rgba(255, 255, 255, 0.72);
-  color: #1e293b;
+  border: 1px solid var(--theme-surface-neutral-button-border);
+  background: var(--theme-surface-neutral-button-background);
+  color: var(--theme-text-primary);
   border-radius: 8px;
   padding: 4px 8px;
   cursor: pointer;
 }
 
 .row-actions .cancel-button {
-  border-color: rgba(248, 113, 113, 0.4);
-  background: rgba(254, 226, 226, 0.8);
-  color: #7f1d1d;
+  border-color: var(--theme-danger-soft-border);
+  background: var(--theme-danger-soft-background);
+  color: var(--theme-text-danger-strong);
 }
 
 .row-actions .danger-action {
-  border-color: rgba(248, 113, 113, 0.65);
-  background: rgba(220, 38, 38, 0.86);
-  color: #fef2f2;
+  border-color: var(--theme-danger-strong-border);
+  background: var(--theme-danger-strong-background);
+  color: var(--theme-danger-strong-text);
 }
 
 .create-error {
   margin: 0 10px 8px;
-  color: #b91c1c;
+  color: var(--theme-danger-subtle-text);
   font-size: 12px;
 }
 
@@ -1133,9 +1133,9 @@ onBeforeUnmount(() => {
 }
 
 .rows-footer button {
-  border: 1px solid rgba(148, 163, 184, 0.45);
-  background: rgba(255, 255, 255, 0.8);
-  color: #0f172a;
+  border: 1px solid var(--theme-surface-neutral-button-border);
+  background: var(--theme-surface-input-background);
+  color: var(--theme-text-primary);
   border-radius: 8px;
   padding: 5px 9px;
   font-size: 12px;
@@ -1144,7 +1144,7 @@ onBeforeUnmount(() => {
 
 .rows-indicator {
   margin: 0;
-  color: #334155;
+  color: var(--theme-text-secondary);
   font-size: 12px;
   font-weight: 600;
 }
@@ -1152,7 +1152,7 @@ onBeforeUnmount(() => {
 .hint {
   margin: 0;
   padding: 14px;
-  color: #334155;
+  color: var(--theme-text-secondary);
   font-size: 13px;
 }
 </style>

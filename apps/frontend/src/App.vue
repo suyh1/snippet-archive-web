@@ -20,6 +20,18 @@ import {
   normalizeLanguage,
   type SupportedEditorLanguage,
 } from '@/utils/language-detect'
+import {
+  applyBuiltinUiTheme,
+  buildThemeExportFileName,
+  buildThemeExportPayload,
+  getActiveUiTheme,
+  getBuiltinUiThemeCatalog,
+  importUiThemeFile,
+  initializeUiTheme,
+  isBuiltinThemeId,
+  resetUiThemeToDefault,
+} from '@/themes/theme-runtime'
+import { normalizeThemeExportFileName, type UiThemeFile } from '@/themes/theme-schema'
 
 const workspaceStore = useWorkspaceStore()
 
@@ -141,8 +153,117 @@ const filteredLanguageOptions = computed(() => {
 const visibleLanguageCountText = computed(() => {
   return `${filteredLanguageOptions.value.length} / ${MANUAL_LANGUAGE_OPTIONS.length}`
 })
+const themeImportInputRef = ref<HTMLInputElement | null>(null)
+const themeFeedbackMessage = ref('')
+const activeUiTheme = ref<UiThemeFile>(getActiveUiTheme())
+const builtinThemeOptions = getBuiltinUiThemeCatalog()
+const selectedBuiltinThemeId = ref(builtinThemeOptions[0]?.id ?? 'glass-gradient')
+const themeExportName = ref(normalizeThemeExportFileName(activeUiTheme.value.meta.id))
+const themeTutorialDocPath = 'docs/theme-authoring.md'
+
+const currentThemeMetaText = computed(() => {
+  const versionLabel = activeUiTheme.value.meta.version ? ` v${activeUiTheme.value.meta.version}` : ''
+  return `${activeUiTheme.value.meta.name}${versionLabel}`
+})
+
+function syncThemeExportName() {
+  themeExportName.value = normalizeThemeExportFileName(activeUiTheme.value.meta.id)
+}
+
+function syncBuiltinThemeSelection() {
+  if (!isBuiltinThemeId(activeUiTheme.value.meta.id)) {
+    return
+  }
+
+  selectedBuiltinThemeId.value = activeUiTheme.value.meta.id
+}
+
+function applySelectedBuiltinTheme() {
+  const result = applyBuiltinUiTheme(selectedBuiltinThemeId.value)
+  if (!result.ok) {
+    themeFeedbackMessage.value = `切换失败：${result.error}`
+    return
+  }
+
+  activeUiTheme.value = result.theme
+  syncBuiltinThemeSelection()
+  syncThemeExportName()
+  themeFeedbackMessage.value = `已切换系统主题：${result.theme.meta.name}`
+}
+
+function handleThemeExportNameBlur() {
+  themeExportName.value = normalizeThemeExportFileName(themeExportName.value)
+}
+
+function exportCurrentThemeFile() {
+  const fileName = buildThemeExportFileName(themeExportName.value || activeUiTheme.value.meta.id)
+  const exportText = buildThemeExportPayload(activeUiTheme.value)
+  const blob = new Blob([exportText], { type: 'application/json' })
+  const blobUrl = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = blobUrl
+  anchor.download = fileName
+  anchor.click()
+  URL.revokeObjectURL(blobUrl)
+  themeFeedbackMessage.value = `主题已导出：${fileName}`
+}
+
+function handleThemeExportNameKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    syncThemeExportName()
+    return
+  }
+
+  if (event.key !== 'Enter') {
+    return
+  }
+
+  event.preventDefault()
+  handleThemeExportNameBlur()
+  exportCurrentThemeFile()
+}
+
+function openThemeImportPicker() {
+  themeImportInputRef.value?.click()
+}
+
+async function handleThemeImport(event: Event) {
+  const target = event.target as HTMLInputElement | null
+  const file = target?.files?.[0]
+  if (!file) {
+    return
+  }
+
+  const result = await importUiThemeFile(file)
+  if (!result.ok) {
+    themeFeedbackMessage.value = `导入失败：${result.error}`
+    if (target) {
+      target.value = ''
+    }
+    return
+  }
+
+  activeUiTheme.value = result.theme
+  syncBuiltinThemeSelection()
+  syncThemeExportName()
+  themeFeedbackMessage.value = `主题已导入并应用：${result.theme.meta.name}`
+  if (target) {
+    target.value = ''
+  }
+}
+
+function restoreDefaultTheme() {
+  activeUiTheme.value = resetUiThemeToDefault()
+  syncBuiltinThemeSelection()
+  syncThemeExportName()
+  themeFeedbackMessage.value = '已恢复默认玻璃主题。'
+}
 
 onMounted(async () => {
+  activeUiTheme.value = initializeUiTheme()
+  syncBuiltinThemeSelection()
+  syncThemeExportName()
+
   const storedTheme = window.localStorage.getItem('editor-theme')
   if (
     storedTheme === 'glacier-night' ||
@@ -631,7 +752,107 @@ onBeforeUnmount(() => {
             class="settings-tab-panel"
             data-testid="settings-panel-general"
           >
-            <p>更多设置项会在后续版本补充，当前可在“支持语言”中查看编辑器语言清单。</p>
+            <p>管理全局主题文件。你可以导出当前主题、导入 JSON 主题并实时应用。</p>
+
+            <article class="theme-settings" data-testid="settings-theme-panel">
+              <header class="theme-settings-head">
+                <div>
+                  <h4>全局玻璃主题</h4>
+                  <p data-testid="settings-theme-current-name">
+                    {{ currentThemeMetaText }}
+                  </p>
+                </div>
+                <code data-testid="settings-theme-current-id">
+                  {{ activeUiTheme.meta.id }}
+                </code>
+              </header>
+
+              <label class="theme-preset-selector">
+                <span>系统预置主题（9 套）</span>
+                <div class="theme-preset-actions">
+                  <select
+                    v-model="selectedBuiltinThemeId"
+                    data-testid="settings-theme-preset-select"
+                  >
+                    <option
+                      v-for="theme in builtinThemeOptions"
+                      :key="theme.id"
+                      :value="theme.id"
+                    >
+                      {{ theme.name }}
+                    </option>
+                  </select>
+                  <button
+                    type="button"
+                    class="theme-action"
+                    data-testid="settings-theme-apply-preset"
+                    @click="applySelectedBuiltinTheme"
+                  >
+                    一键切换
+                  </button>
+                </div>
+              </label>
+
+              <label class="theme-export-name">
+                <span>导出文件名</span>
+                <input
+                  v-model="themeExportName"
+                  data-testid="settings-theme-export-name"
+                  type="text"
+                  placeholder="glass-gradient"
+                  @blur="handleThemeExportNameBlur"
+                  @keydown="handleThemeExportNameKeydown"
+                >
+              </label>
+
+              <div class="theme-actions">
+                <button
+                  type="button"
+                  class="theme-action primary"
+                  data-testid="settings-theme-export"
+                  @click="exportCurrentThemeFile"
+                >
+                  导出主题文件
+                </button>
+                <button
+                  type="button"
+                  class="theme-action"
+                  data-testid="settings-theme-import-trigger"
+                  @click="openThemeImportPicker"
+                >
+                  导入主题文件
+                </button>
+                <button
+                  type="button"
+                  class="theme-action"
+                  data-testid="settings-theme-reset"
+                  @click="restoreDefaultTheme"
+                >
+                  恢复默认主题
+                </button>
+                <input
+                  ref="themeImportInputRef"
+                  data-testid="settings-theme-import-input"
+                  type="file"
+                  class="theme-import-input"
+                  accept=".json,application/json"
+                  @change="handleThemeImport"
+                >
+              </div>
+
+              <p class="theme-hint">
+                主题文件遵循模块化结构：`schemaVersion + meta + modules`，编写说明见
+                <code>{{ themeTutorialDocPath }}</code>。
+              </p>
+
+              <p
+                v-if="themeFeedbackMessage"
+                class="theme-feedback"
+                data-testid="settings-theme-import-message"
+              >
+                {{ themeFeedbackMessage }}
+              </p>
+            </article>
           </section>
 
           <section
@@ -909,13 +1130,9 @@ onBeforeUnmount(() => {
   height: 100vh;
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
-  font-family: 'Manrope', 'Plus Jakarta Sans', 'Avenir Next', sans-serif;
+  font-family: var(--theme-layout-app-font-family);
   overflow: hidden;
-  background:
-    radial-gradient(circle at 12% 8%, rgba(56, 189, 248, 0.26), transparent 40%),
-    radial-gradient(circle at 88% 0%, rgba(20, 184, 166, 0.24), transparent 36%),
-    radial-gradient(circle at 45% 100%, rgba(99, 102, 241, 0.2), transparent 45%),
-    linear-gradient(160deg, #e0f2fe 0%, #e2e8f0 52%, #dbeafe 100%);
+  background: var(--theme-layout-app-shell-background);
 }
 
 .content {
@@ -942,7 +1159,7 @@ onBeforeUnmount(() => {
 
 .eyebrow {
   margin: 0;
-  color: #0369a1;
+  color: var(--theme-text-accent);
   text-transform: uppercase;
   font-size: 11px;
   letter-spacing: 0.09em;
@@ -953,20 +1170,20 @@ h2 {
   margin: 2px 0 0;
   font-size: 26px;
   line-height: 1.1;
-  color: #0f172a;
+  color: var(--theme-text-primary);
 }
 
 .meta {
   margin: 0;
-  color: #334155;
+  color: var(--theme-text-secondary);
   font-size: 13px;
   font-weight: 600;
 }
 
 .head-action-button {
-  border: 1px solid rgba(14, 165, 233, 0.46);
-  background: rgba(255, 255, 255, 0.76);
-  color: #0f172a;
+  border: 1px solid var(--theme-accent-primary-button-border);
+  background: var(--theme-surface-ghost-button-background);
+  color: var(--theme-text-primary);
   border-radius: 9px;
   padding: 7px 10px;
   cursor: pointer;
@@ -977,10 +1194,10 @@ h2 {
 .error-banner {
   margin: 0;
   padding: 10px 12px;
-  border: 1px solid rgba(248, 113, 113, 0.35);
-  background: rgba(254, 226, 226, 0.78);
-  backdrop-filter: blur(8px);
-  color: #991b1b;
+  border: 1px solid var(--theme-danger-soft-border);
+  background: var(--theme-danger-soft-background);
+  backdrop-filter: var(--theme-surface-overlay-blur);
+  color: var(--theme-danger-soft-text);
   border-radius: 12px;
 }
 
@@ -1017,11 +1234,11 @@ h2 {
 }
 
 .settings-panel {
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.62), rgba(219, 234, 254, 0.36));
-  border: 1px solid rgba(255, 255, 255, 0.68);
+  background: var(--theme-surface-glass-panel-background);
+  border: 1px solid var(--theme-surface-glass-panel-border);
   border-radius: 16px;
-  backdrop-filter: blur(12px);
-  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.1);
+  backdrop-filter: var(--theme-surface-overlay-blur);
+  box-shadow: var(--theme-surface-glass-panel-shadow);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
@@ -1032,14 +1249,14 @@ h2 {
   display: inline-flex;
   gap: 8px;
   padding: 10px 12px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+  border-bottom: 1px solid var(--theme-surface-statusbar-border);
 }
 
 .settings-tab-button {
-  border: 1px solid rgba(148, 163, 184, 0.4);
+  border: 1px solid var(--theme-accent-action-button-border);
   border-radius: 9px;
-  background: rgba(241, 245, 249, 0.7);
-  color: #334155;
+  background: var(--theme-accent-action-button-background);
+  color: var(--theme-accent-action-button-text);
   padding: 7px 10px;
   font-size: 12px;
   font-weight: 700;
@@ -1047,9 +1264,9 @@ h2 {
 }
 
 .settings-tab-button[aria-selected='true'] {
-  border-color: rgba(14, 165, 233, 0.5);
-  background: rgba(14, 165, 233, 0.15);
-  color: #075985;
+  border-color: var(--theme-accent-selected-border);
+  background: var(--theme-accent-selected-background);
+  color: var(--theme-accent-selected-text);
 }
 
 .settings-tab-panel {
@@ -1062,8 +1279,142 @@ h2 {
 
 .settings-tab-panel p {
   margin: 0;
-  color: #334155;
+  color: var(--theme-text-secondary);
   font-size: 13px;
+}
+
+.theme-settings {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--theme-surface-glass-panel-border);
+  border-radius: 12px;
+  padding: 10px;
+  background: var(--theme-surface-glass-card-background);
+  box-shadow: var(--theme-surface-glass-panel-shadow);
+}
+
+.theme-settings-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.theme-settings-head h4 {
+  margin: 0;
+  color: var(--theme-text-primary);
+  font-size: 15px;
+}
+
+.theme-settings-head p {
+  margin: 2px 0 0;
+  color: var(--theme-text-tertiary);
+  font-size: 12px;
+}
+
+.theme-settings-head code {
+  color: var(--theme-text-primary);
+  background: var(--theme-surface-code-tag-background);
+  border-radius: 7px;
+  padding: 3px 7px;
+  font-size: 12px;
+}
+
+.theme-export-name {
+  display: grid;
+  gap: 6px;
+}
+
+.theme-preset-selector {
+  display: grid;
+  gap: 6px;
+}
+
+.theme-preset-selector span {
+  color: var(--theme-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.theme-preset-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.theme-preset-actions select {
+  border: 1px solid var(--theme-surface-input-border);
+  background: var(--theme-surface-input-background);
+  color: var(--theme-text-primary);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.theme-export-name span {
+  color: var(--theme-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.theme-export-name input {
+  border: 1px solid var(--theme-surface-input-border);
+  background: var(--theme-surface-input-background);
+  color: var(--theme-text-primary);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-size: 13px;
+}
+
+.theme-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.theme-action {
+  border: 1px solid var(--theme-accent-action-button-border);
+  background: var(--theme-surface-neutral-button-background);
+  color: var(--theme-text-primary);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.theme-action.primary {
+  border-color: var(--theme-accent-primary-button-border);
+  background: var(--theme-accent-primary-button-gradient);
+  color: var(--theme-accent-primary-button-text);
+}
+
+.theme-import-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.theme-hint {
+  color: var(--theme-text-secondary);
+  font-size: 12px;
+}
+
+.theme-hint code {
+  background: var(--theme-surface-code-tag-background);
+  color: var(--theme-text-primary);
+  border-radius: 6px;
+  padding: 2px 5px;
+}
+
+.theme-feedback {
+  color: var(--theme-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .language-panel-head {
@@ -1075,11 +1426,12 @@ h2 {
 
 .language-panel-head input {
   width: min(440px, 100%);
-  border: 1px solid rgba(148, 163, 184, 0.55);
-  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid var(--theme-surface-input-border);
+  background: var(--theme-surface-input-background);
   border-radius: 9px;
   padding: 7px 10px;
   font-size: 13px;
+  color: var(--theme-text-primary);
 }
 
 .language-list {
@@ -1097,9 +1449,9 @@ h2 {
 }
 
 .language-item {
-  border: 1px solid rgba(148, 163, 184, 0.36);
+  border: 1px solid var(--theme-surface-input-border);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.65);
+  background: var(--theme-surface-glass-card-background);
   padding: 8px 10px;
   display: grid;
   align-content: start;
@@ -1108,37 +1460,37 @@ h2 {
 }
 
 .language-item strong {
-  color: #0f172a;
+  color: var(--theme-text-primary);
   font-size: 13px;
 }
 
 .language-item code {
-  color: #0f172a;
+  color: var(--theme-text-primary);
   font-size: 12px;
-  background: rgba(148, 163, 184, 0.18);
+  background: var(--theme-surface-code-tag-background);
   border-radius: 6px;
   width: fit-content;
   padding: 2px 6px;
 }
 
 .summary-card {
-  background: linear-gradient(140deg, rgba(255, 255, 255, 0.72), rgba(224, 242, 254, 0.52));
-  border: 1px solid rgba(255, 255, 255, 0.68);
+  background: var(--theme-surface-glass-card-background);
+  border: 1px solid var(--theme-surface-glass-panel-border);
   border-radius: 14px;
-  backdrop-filter: blur(12px);
-  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.1);
+  backdrop-filter: var(--theme-surface-overlay-blur);
+  box-shadow: var(--theme-surface-glass-panel-shadow);
   padding: 12px 14px;
 }
 
 .summary-card h3 {
   margin: 0 0 6px;
   font-size: 18px;
-  color: #0f172a;
+  color: var(--theme-text-primary);
 }
 
 .summary-card p {
   margin: 0;
-  color: #334155;
+  color: var(--theme-text-secondary);
   line-height: 1.45;
   font-size: 13px;
 }
@@ -1164,44 +1516,44 @@ h2 {
 }
 
 .workspace-tile {
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.74), rgba(224, 242, 254, 0.45));
+  border: 1px solid var(--theme-surface-glass-tile-border);
+  background: var(--theme-surface-glass-tile-background);
   border-radius: 12px;
   padding: 10px 12px;
   text-align: left;
   display: grid;
   gap: 4px;
   cursor: pointer;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+  backdrop-filter: var(--theme-surface-overlay-blur);
+  box-shadow: var(--theme-surface-glass-panel-shadow);
   transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
 }
 
 .workspace-tile:hover {
   transform: translateY(-1px);
-  border-color: rgba(56, 189, 248, 0.6);
-  box-shadow: 0 14px 28px rgba(14, 116, 144, 0.16);
+  border-color: var(--theme-accent-row-action-border);
+  box-shadow: var(--theme-surface-toast-shadow);
 }
 
 .workspace-tile strong {
   font-size: 14px;
-  color: #0f172a;
+  color: var(--theme-text-primary);
 }
 
 .workspace-tile span {
-  color: #475569;
+  color: var(--theme-text-tertiary);
   font-size: 12px;
 }
 
 .empty-note {
   margin: 0;
-  color: #334155;
+  color: var(--theme-text-secondary);
   font-size: 13px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px dashed rgba(148, 163, 184, 0.55);
-  background: rgba(255, 255, 255, 0.45);
-  backdrop-filter: blur(6px);
+  border: 1px dashed var(--theme-surface-input-border);
+  background: var(--theme-surface-empty-state-background);
+  backdrop-filter: var(--theme-surface-overlay-soft-blur);
 }
 
 .workspace-main {
@@ -1215,11 +1567,11 @@ h2 {
 }
 
 .editor-panel {
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.62), rgba(219, 234, 254, 0.36));
-  border: 1px solid rgba(255, 255, 255, 0.68);
+  background: var(--theme-surface-glass-panel-background);
+  border: 1px solid var(--theme-surface-glass-panel-border);
   border-radius: 16px;
-  backdrop-filter: blur(12px);
-  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.1);
+  backdrop-filter: var(--theme-surface-overlay-blur);
+  box-shadow: var(--theme-surface-glass-panel-shadow);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   min-height: 0;
@@ -1232,8 +1584,8 @@ h2 {
   justify-content: space-between;
   gap: 10px;
   padding: 10px 12px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.3);
-  background: linear-gradient(120deg, rgba(219, 234, 254, 0.55), rgba(186, 230, 253, 0.28));
+  border-bottom: 1px solid var(--theme-surface-statusbar-border);
+  background: var(--theme-surface-glass-header-background);
 }
 
 .editor-title {
@@ -1243,13 +1595,13 @@ h2 {
 .editor-head h3 {
   margin: 0;
   font-size: 16px;
-  color: #0f172a;
+  color: var(--theme-text-primary);
 }
 
 .editor-path {
   margin: 2px 0 0;
   font-size: 12px;
-  color: #475569;
+  color: var(--theme-text-tertiary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1271,15 +1623,15 @@ h2 {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #334155;
+  color: var(--theme-text-secondary);
   font-size: 12px;
   font-weight: 600;
 }
 
 .theme-picker select {
-  border: 1px solid rgba(148, 163, 184, 0.55);
-  background: rgba(255, 255, 255, 0.78);
-  color: #0f172a;
+  border: 1px solid var(--theme-surface-input-border);
+  background: var(--theme-surface-input-background);
+  color: var(--theme-text-primary);
   border-radius: 8px;
   padding: 5px 8px;
   font-size: 12px;
@@ -1289,24 +1641,24 @@ h2 {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #334155;
+  color: var(--theme-text-secondary);
   font-size: 12px;
   font-weight: 600;
 }
 
 .language-picker select {
-  border: 1px solid rgba(148, 163, 184, 0.55);
-  background: rgba(255, 255, 255, 0.78);
-  color: #0f172a;
+  border: 1px solid var(--theme-surface-input-border);
+  background: var(--theme-surface-input-background);
+  color: var(--theme-text-primary);
   border-radius: 8px;
   padding: 5px 8px;
   font-size: 12px;
 }
 
 .editor-tool-button {
-  border: 1px solid rgba(148, 163, 184, 0.58);
-  background: rgba(248, 250, 252, 0.74);
-  color: #0f172a;
+  border: 1px solid var(--theme-surface-neutral-button-border);
+  background: var(--theme-surface-neutral-button-background);
+  color: var(--theme-text-primary);
   border-radius: 8px;
   padding: 6px 9px;
   cursor: pointer;
@@ -1320,9 +1672,9 @@ h2 {
 }
 
 .save-button {
-  border: 1px solid rgba(14, 165, 233, 0.5);
-  background: linear-gradient(130deg, rgba(14, 165, 233, 0.9), rgba(56, 189, 248, 0.82));
-  color: #f8fafc;
+  border: 1px solid var(--theme-accent-primary-button-border);
+  background: var(--theme-accent-primary-button-gradient);
+  color: var(--theme-accent-primary-button-text);
   border-radius: 9px;
   padding: 7px 12px;
   cursor: pointer;
@@ -1338,7 +1690,7 @@ h2 {
   margin: 0;
   display: grid;
   place-items: center;
-  color: #334155;
+  color: var(--theme-text-secondary);
   font-size: 14px;
   padding: 16px;
 }
@@ -1348,10 +1700,10 @@ h2 {
   align-items: center;
   gap: 14px;
   padding: 7px 12px;
-  border-top: 1px solid rgba(148, 163, 184, 0.3);
-  background: rgba(248, 250, 252, 0.66);
+  border-top: 1px solid var(--theme-surface-statusbar-border);
+  background: var(--theme-surface-statusbar-background);
   font-size: 12px;
-  color: #334155;
+  color: var(--theme-text-secondary);
   white-space: nowrap;
   overflow: auto;
 }
@@ -1364,13 +1716,13 @@ h2 {
   display: flex;
   align-items: center;
   gap: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  border: 1px solid var(--theme-surface-toast-border);
   border-radius: 12px;
   padding: 10px 12px;
-  background: linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.85));
-  color: #e2e8f0;
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.28);
-  backdrop-filter: blur(8px);
+  background: var(--theme-surface-toast-background);
+  color: var(--theme-layout-sidebar-text);
+  box-shadow: var(--theme-surface-toast-shadow);
+  backdrop-filter: var(--theme-surface-overlay-blur);
 }
 
 .undo-toast p {
@@ -1379,10 +1731,10 @@ h2 {
 }
 
 .undo-toast button {
-  border: 1px solid rgba(56, 189, 248, 0.6);
+  border: 1px solid var(--theme-accent-row-action-border);
   border-radius: 9px;
-  background: rgba(14, 165, 233, 0.2);
-  color: #e0f2fe;
+  background: var(--theme-accent-row-action-background);
+  color: var(--theme-accent-primary-button-text);
   padding: 6px 10px;
   cursor: pointer;
   font-weight: 600;
@@ -1424,6 +1776,10 @@ h2 {
   .language-panel-head {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .theme-preset-actions {
+    grid-template-columns: 1fr;
   }
 }
 </style>
