@@ -1,46 +1,22 @@
 # AGENTS.md
 
-## 必读：项目通用测试方案
+## 必读入口（新线程先看这里）
 
-在开始任何需求前，先阅读仓库根目录的 [TESTING.md](./TESTING.md)。  
-`TESTING.md` 提供跨项目通用测试检查方法；本文件提供本仓库的强制约束。若有差异，执行更严格规则。
+在开始任何需求前，按顺序阅读以下文档：
 
-## Mandatory Verification Workflow
+1. [TESTING.md](./TESTING.md)  
+   说明统一测试与验证流程（交互流、几何断言、门禁命令、汇报要求）。
+2. [2026-03-16-product-upgrade-execution-playbook.md](./docs/2026-03-16-product-upgrade-execution-playbook.md)  
+   说明产品三阶段升级路线、技术改造重点、线程拆分顺序与里程碑指标。
 
-These rules are mandatory for every functional change in this repository.
+## 本仓库约束
 
-1. Do not rely on `build`/`typecheck`/unit pass as the only verification.
-2. For every changed user interaction, run behavior-level verification by simulating real UI input.
-3. Behavior-level verification must include, at minimum:
-   - Click flow (`click`, focus switch, blur)
-   - Keyboard flow (`Enter`, `Esc`, continuous typing)
-   - State transition after interaction (UI text, list order, persisted result)
-4. Every interaction bugfix must have a regression test that reproduces the original issue pattern.
-5. A task is not considered complete until all of the following pass:
-   - Targeted regression tests for changed behavior
-   - Full frontend test suite
-   - Typecheck
-   - Build
-6. If verification reveals mismatch between expected and actual interaction behavior, continue iterating until behavior matches product intent.
+1. `AGENTS.md` 只保留仓库入口与补充约束，不重复 `TESTING.md` 的通用条款。
+2. 凡是功能改动、交互改动、布局改动，验证标准与通过条件一律以 `TESTING.md` 为准。
+3. 若 `AGENTS.md` 与 `TESTING.md` 存在冲突，执行更严格规则。
 
-## Layout Verification (Viewport/Fill Cases)
+## 新线程执行建议
 
-These checks are mandatory for layout changes involving full-height panels, split views, or overflow behavior.
-
-1. Do not rely on visual alignment between sibling panels only.
-2. Add behavior-level geometry assertions in e2e using `getBoundingClientRect()`:
-   - Container-to-viewport (`app shell`/page root vs `window.innerHeight`)
-   - Child-to-parent bottom alignment (panel bottom vs parent content-box bottom)
-   - Document overflow (`documentElement.scrollHeight` and `body.scrollHeight` vs viewport)
-3. Validate at least two states:
-   - Sparse/empty state (few or zero rows)
-   - Dense state (many rows/items)
-4. If layout uses segmented/paginated rendering, verify both initial segment and after segment transitions (`click` and keyboard trigger).
-5. Keep tolerance explicit in assertions (e.g. ≤2px for alignment, ≤4px for viewport-height comparisons) and document it in test code.
-
-## Verification Reporting
-
-When reporting completion, always include:
-- Which interaction flows were manually/behaviorally validated
-- Which regression tests were added/updated
-- Command outputs for full suite/typecheck/build
+1. 先在升级方案文档中定位当前线程所属阶段与任务编号。
+2. 按 `TESTING.md` 先写回归测试（先红后绿），再做实现。
+3. 完成后提供证据化汇报：交互覆盖、回归测试、全量命令输出。
