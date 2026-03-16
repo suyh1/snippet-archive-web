@@ -45,7 +45,7 @@ export const workspaceApi = {
   updateFile(
     workspaceId: string,
     fileId: string,
-    payload: Partial<Pick<WorkspaceFile, 'name' | 'path' | 'language' | 'content' | 'kind' | 'order'>>,
+    payload: Partial<Pick<WorkspaceFile, 'name' | 'path' | 'language' | 'content' | 'tags' | 'starred' | 'kind' | 'order'>>,
   ) {
     return apiRequest<WorkspaceFile>(`/workspaces/${workspaceId}/files/${fileId}`, {
       method: 'PATCH',

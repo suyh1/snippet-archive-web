@@ -272,6 +272,46 @@ paths:
                 $ref: '#/components/schemas/SearchSnippetListResponse'
         '400':
           $ref: '#/components/responses/ValidationError'
+  /api/favorites:
+    get:
+      summary: List favorites
+      parameters:
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, workspace, file]
+            default: all
+        - name: tag
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Favorites list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FavoriteListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
 components:
   parameters:
     WorkspaceId:
@@ -356,6 +396,8 @@ components:
           type: array
           items:
             type: string
+        starred:
+          type: boolean
         kind:
           type: string
           enum: [file, folder]
@@ -367,7 +409,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, workspaceId, name, path, language, content, tags, kind, order, createdAt, updatedAt]
+      required: [id, workspaceId, name, path, language, content, tags, starred, kind, order, createdAt, updatedAt]
     CreateWorkspaceInput:
       type: object
       properties:
@@ -415,6 +457,8 @@ components:
           type: array
           items:
             type: string
+        starred:
+          type: boolean
       required: [name, path, language, kind, order]
     UpdateWorkspaceFileInput:
       type: object
@@ -436,6 +480,8 @@ components:
           type: array
           items:
             type: string
+        starred:
+          type: boolean
     SearchSnippet:
       type: object
       properties:
@@ -552,6 +598,54 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/SearchSnippet'
+            total:
+              type: integer
+            page:
+              type: integer
+            pageSize:
+              type: integer
+          required: [items, total, page, pageSize]
+      required: [data]
+    FavoriteItem:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [workspace, file]
+        id:
+          type: string
+          format: uuid
+        workspaceId:
+          type: string
+          format: uuid
+        workspaceTitle:
+          type: string
+        title:
+          type: string
+        path:
+          type: string
+          nullable: true
+        language:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        starredAt:
+          type: string
+          format: date-time
+      required: [type, id, workspaceId, workspaceTitle, title, path, language, tags, starredAt]
+    FavoriteListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/FavoriteItem'
             total:
               type: integer
             page:

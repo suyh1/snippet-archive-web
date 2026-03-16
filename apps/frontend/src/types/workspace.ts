@@ -17,6 +17,7 @@ export type WorkspaceFile = {
   language: string
   content: string
   tags?: string[]
+  starred?: boolean
   kind: string
   order: number
   createdAt?: string
@@ -35,6 +36,8 @@ export type CreateWorkspaceFileInput = {
   path: string
   language: string
   content?: string
+  tags?: string[]
+  starred?: boolean
   kind: string
   order: number
 }
@@ -71,6 +74,25 @@ export type SearchSnippetsInput = {
 
 export type SearchSnippetsResult = {
   items: SearchSnippet[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export type FavoriteItem = {
+  type: 'workspace' | 'file'
+  id: string
+  workspaceId: string
+  workspaceTitle: string
+  title: string
+  path: string | null
+  language: string | null
+  tags: string[]
+  starredAt: string
+}
+
+export type FavoritesResult = {
+  items: FavoriteItem[]
   total: number
   page: number
   pageSize: number

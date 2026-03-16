@@ -232,7 +232,7 @@
 推荐线程切分顺序：
 
 1. 线程 A：搜索中心与搜索 API（✅ 已完成）。
-2. 线程 B：标签与收藏（未开始）。
+2. 线程 B：标签与收藏（✅ 已完成）。
 3. 线程 C：revision 后端模型 + API（未开始）。
 4. 线程 D：revision 前端面板 + 回滚（未开始）。
 5. 线程 E：前端路由与 store 解耦（未开始）。
@@ -359,3 +359,62 @@ A6 完成标记：
    - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
    - `npm run typecheck --workspace @snippet-archive/frontend`
    - `npm run build`
+
+### 2026-03-16｜线程 B（完成）
+
+1. 目标：完成“标签体系 + 收藏聚合视图”并通过门禁。
+2. 结果：
+   - 后端：`WorkspaceFile` 增加 `starred` 字段；新增 `GET /api/favorites` 聚合接口。
+   - 前端：工作区/文件支持收藏切换；工作区/文件支持标签编辑（Enter/blur 提交、Esc 取消）；新增收藏页 `/favorites`。
+   - 文档：OpenAPI 同步收藏接口与 starred 字段。
+3. 验证命令（均通过）：
+   - `npm run test --workspace @snippet-archive/backend`
+   - `npm run test:e2e --workspace @snippet-archive/backend`
+   - `npm run test:run --workspace @snippet-archive/frontend`
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
+   - `npm run typecheck --workspace @snippet-archive/frontend`
+   - `npm run build`
+
+## 12. 阶段一执行细化（线程 B：标签与收藏）
+
+### 12.1 线程目标
+
+1. 补齐工作区标签、文件标签、收藏能力的可见交互入口。
+2. 提供收藏聚合视图（独立页面）并支持标签过滤。
+3. 确保标签过滤可与收藏过滤组合使用。
+
+### 12.2 线程 B 小功能点清单（逐项打标）
+
+B0 文档与状态：
+- [x] B0-1：在线程总览中将线程 B 状态标记为“进行中”。
+- [x] B0-2：在本文件追加线程 B 细化清单与执行记录。
+
+B1 后端数据与接口：
+- [x] B1-1：`WorkspaceFile` 增加 `starred` 字段并默认 `false`。
+- [x] B1-2：工作区/文件的更新接口支持标签与收藏字段更新。
+- [x] B1-3：新增收藏聚合接口（独立于搜索页接口）。
+- [x] B1-4：补充 OpenAPI 与后端 e2e 回归测试（先红后绿）。
+
+B2 前端标签交互：
+- [x] B2-1：工作区支持标签编辑（至少覆盖 Enter/blur 提交与 Esc 取消）。
+- [x] B2-2：文件支持标签编辑（至少覆盖 Enter/blur 提交与 Esc 取消）。
+- [x] B2-3：标签改动后 UI 与持久化状态一致。
+
+B3 前端收藏交互与视图：
+- [x] B3-1：工作区支持收藏/取消收藏切换。
+- [x] B3-2：文件支持收藏/取消收藏切换。
+- [x] B3-3：新增收藏聚合页面并支持标签过滤。
+- [x] B3-4：收藏项可跳转回工作区与文件上下文。
+
+B4 验证门禁：
+- [x] B4-1：targeted 回归（backend + frontend + e2e）通过。
+- [x] B4-2：full gate（test/typecheck/build）通过。
+
+B5 完成标记：
+- [x] B5-1：线程清单将“线程 B”标记为已完成。
+- [x] B5-2：追加线程 B 完成执行记录与命令证据。
+
+### 12.3 线程 B 当前状态
+
+1. 当前状态：✅ 已完成（线程 B 全部验收通过）。
+2. 当前阻塞：无。

@@ -28,6 +28,7 @@ model WorkspaceFile {
   language    String
   content     String    @default("")
   tags        String[]  @default([])
+  starred     Boolean   @default(false)
   kind        String
   order       Int
   createdAt   DateTime  @default(now())
@@ -37,4 +38,5 @@ model WorkspaceFile {
   @@index([workspaceId, path])
   @@index([workspaceId, language])
   @@index([workspaceId, updatedAt])
+  @@index([workspaceId, starred])
 }

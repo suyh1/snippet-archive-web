@@ -12,6 +12,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   open: [workspaceId: string]
   delete: [workspaceId: string]
+  toggleStar: [workspaceId: string]
   create: [title: string]
   library: []
 }>()
@@ -64,6 +65,16 @@ function submitCreate() {
           @click="emit('open', item.id)"
         >
           <span class="title">{{ item.title }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="star-button"
+          :title="item.starred ? '取消收藏工作区' : '收藏工作区'"
+          data-testid="workspace-sidebar-star-toggle"
+          @click.stop="emit('toggleStar', item.id)"
+        >
+          {{ item.starred ? '已收藏' : '收藏' }}
         </button>
 
         <button
@@ -151,7 +162,7 @@ h1 {
 
 .workspace-item {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   align-items: center;
   gap: 6px;
   border: 1px solid var(--theme-surface-statusbar-border);
@@ -191,6 +202,15 @@ h1 {
   border: 1px solid var(--theme-danger-soft-border);
   background: var(--theme-danger-soft-background);
   color: var(--theme-danger-soft-text);
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.star-button {
+  border: 1px solid var(--theme-accent-row-action-border);
+  background: var(--theme-accent-row-action-background);
+  color: var(--theme-accent-row-action-text);
   border-radius: 8px;
   padding: 6px 10px;
   cursor: pointer;

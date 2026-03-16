@@ -30,6 +30,14 @@ function isActive(path: string) {
           搜索
         </RouterLink>
         <RouterLink
+          data-testid="nav-favorites"
+          class="route-shell-link"
+          :class="{ active: isActive('/favorites') }"
+          to="/favorites"
+        >
+          收藏
+        </RouterLink>
+        <RouterLink
           data-testid="nav-settings"
           class="route-shell-link"
           :class="{ active: isActive('/settings') }"

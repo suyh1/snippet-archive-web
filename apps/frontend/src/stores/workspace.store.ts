@@ -122,6 +122,23 @@ function inferLanguage(name: string) {
   return inferLanguageFromFileName(name) ?? 'plaintext'
 }
 
+function normalizeTags(tags: string[]) {
+  const seen = new Set<string>()
+  const normalized: string[] = []
+
+  for (const raw of tags) {
+    const value = raw.trim()
+    if (!value || seen.has(value)) {
+      continue
+    }
+
+    seen.add(value)
+    normalized.push(value)
+  }
+
+  return normalized.slice(0, 50)
+}
+
 export const useWorkspaceStore = defineStore('workspace', {
   state: () => ({
     workspaces: [] as Workspace[],
@@ -452,6 +469,46 @@ export const useWorkspaceStore = defineStore('workspace', {
       } finally {
         this.saving = false
       }
+    },
+
+    async updateWorkspaceMeta(
+      workspaceId: string,
+      payload: Partial<Pick<Workspace, 'tags' | 'starred'>>,
+    ) {
+      this.saving = true
+      this.errorMessage = null
+
+      try {
+        const updated = await workspaceApi.update(workspaceId, {
+          ...payload,
+          ...(payload.tags ? { tags: normalizeTags(payload.tags) } : {}),
+        })
+
+        const index = this.workspaces.findIndex((item) => item.id === workspaceId)
+        if (index >= 0) {
+          this.workspaces[index] = updated
+        } else {
+          this.workspaces = [updated, ...this.workspaces]
+        }
+      } catch (error) {
+        this.errorMessage = resolveWorkspaceErrorMessage(
+          error,
+          '更新工作区信息失败，请稍后重试。',
+        )
+      } finally {
+        this.saving = false
+      }
+    },
+
+    async toggleWorkspaceStar(workspaceId: string) {
+      const target = this.workspaces.find((item) => item.id === workspaceId)
+      if (!target) {
+        return
+      }
+
+      await this.updateWorkspaceMeta(workspaceId, {
+        starred: !target.starred,
+      })
     },
 
     async deleteWorkspace(workspaceId: string) {
@@ -826,6 +883,48 @@ export const useWorkspaceStore = defineStore('workspace', {
           '重命名失败，请稍后重试。',
         )
       }
+    },
+
+    async updateFileMeta(
+      fileId: string,
+      payload: Partial<Pick<WorkspaceFile, 'tags' | 'starred'>>,
+    ) {
+      const workspaceId = this.currentWorkspaceId
+      if (!workspaceId) {
+        return
+      }
+
+      const target = this.files.find((item) => item.id === fileId)
+      if (!target || target.kind !== 'file') {
+        return
+      }
+
+      this.errorMessage = null
+
+      try {
+        const updated = await workspaceApi.updateFile(workspaceId, fileId, {
+          ...payload,
+          ...(payload.tags ? { tags: normalizeTags(payload.tags) } : {}),
+        })
+
+        this.files = this.files.map((item) => (item.id === fileId ? updated : item))
+      } catch (error) {
+        this.errorMessage = resolveWorkspaceErrorMessage(
+          error,
+          '更新文件信息失败，请稍后重试。',
+        )
+      }
+    },
+
+    async toggleActiveFileStar() {
+      const active = this.files.find((item) => item.id === this.activeFileId)
+      if (!active || active.kind !== 'file') {
+        return
+      }
+
+      await this.updateFileMeta(active.id, {
+        starred: !(active.starred ?? false),
+      })
     },
 
     async deleteFile(fileId: string) {

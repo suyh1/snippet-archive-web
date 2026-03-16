@@ -128,6 +128,8 @@ const props = withDefaults(
 const currentView = ref<AppView>(props.initialView)
 const settingsTab = ref<SettingsTab>('languages')
 const languageSearchQuery = ref('')
+const workspaceTagsInput = ref('')
+const fileTagsInput = ref('')
 const isSettingsView = computed(() => currentView.value === 'settings')
 const pageTitle = computed(() => {
   if (isSettingsView.value) {
@@ -359,6 +361,9 @@ onMounted(async () => {
   if (fileId && workspaceStore.files.some((item) => item.id === fileId)) {
     workspaceStore.selectFile(fileId)
   }
+
+  syncWorkspaceTagsInput()
+  syncFileTagsInput()
 })
 
 watch(editorTheme, (theme) => {
@@ -389,6 +394,106 @@ function backToWorkspaceView() {
 
 function switchSettingsTab(tab: SettingsTab) {
   settingsTab.value = tab
+}
+
+function normalizeTagsInput(value: string) {
+  const seen = new Set<string>()
+  const tags: string[] = []
+
+  for (const raw of value.split(',')) {
+    const trimmed = raw.trim()
+    if (!trimmed || seen.has(trimmed)) {
+      continue
+    }
+
+    seen.add(trimmed)
+    tags.push(trimmed)
+  }
+
+  return tags
+}
+
+function tagsToInputValue(tags: string[] | undefined) {
+  return (tags ?? []).join(', ')
+}
+
+function syncWorkspaceTagsInput() {
+  workspaceTagsInput.value = tagsToInputValue(currentWorkspace.value?.tags)
+}
+
+function syncFileTagsInput() {
+  const active = activeFile.value
+  if (!active || active.kind !== 'file') {
+    fileTagsInput.value = ''
+    return
+  }
+
+  fileTagsInput.value = tagsToInputValue(active.tags)
+}
+
+async function commitWorkspaceTags() {
+  if (!currentWorkspace.value) {
+    return
+  }
+
+  const nextTags = normalizeTagsInput(workspaceTagsInput.value)
+  const currentTags = currentWorkspace.value.tags ?? []
+  if (JSON.stringify(nextTags) === JSON.stringify(currentTags)) {
+    workspaceTagsInput.value = tagsToInputValue(currentTags)
+    return
+  }
+
+  await workspaceStore.updateWorkspaceMeta(currentWorkspace.value.id, {
+    tags: nextTags,
+  })
+  syncWorkspaceTagsInput()
+}
+
+async function commitFileTags() {
+  const active = activeFile.value
+  if (!active || active.kind !== 'file') {
+    return
+  }
+
+  const nextTags = normalizeTagsInput(fileTagsInput.value)
+  const currentTags = active.tags ?? []
+  if (JSON.stringify(nextTags) === JSON.stringify(currentTags)) {
+    fileTagsInput.value = tagsToInputValue(currentTags)
+    return
+  }
+
+  await workspaceStore.updateFileMeta(active.id, {
+    tags: nextTags,
+  })
+  syncFileTagsInput()
+}
+
+function onWorkspaceTagsKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    syncWorkspaceTagsInput()
+    return
+  }
+
+  if (event.key !== 'Enter') {
+    return
+  }
+
+  event.preventDefault()
+  void commitWorkspaceTags()
+}
+
+function onFileTagsKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    syncFileTagsInput()
+    return
+  }
+
+  if (event.key !== 'Enter') {
+    return
+  }
+
+  event.preventDefault()
+  void commitFileTags()
 }
 
 function resolveUnsavedChoice(decision: 'save' | 'discard' | 'cancel') {
@@ -431,6 +536,10 @@ function openWorkspace(workspaceId: string) {
 
 function createWorkspace(title: string) {
   void workspaceStore.createWorkspace(title)
+}
+
+function toggleWorkspaceStar(workspaceId: string) {
+  void workspaceStore.toggleWorkspaceStar(workspaceId)
 }
 
 function deleteWorkspace(workspaceId: string) {
@@ -480,6 +589,10 @@ function selectFile(fileId: string) {
 
 function renameFile(payload: { fileId: string; newName: string }) {
   void workspaceStore.renameFile(payload.fileId, payload.newName)
+}
+
+function toggleActiveFileStar() {
+  void workspaceStore.toggleActiveFileStar()
 }
 
 function deleteFile(fileId: string) {
@@ -705,6 +818,7 @@ watch(
     hideDeletedFileToast()
     clearAutoSaveTimer()
     historyAvailability.value = { canUndo: false, canRedo: false }
+    syncWorkspaceTagsInput()
   },
 )
 
@@ -742,6 +856,7 @@ watch(
       cursorColumn: 1,
       eol: 'LF',
     }
+    syncFileTagsInput()
   },
 )
 
@@ -759,6 +874,7 @@ onBeforeUnmount(() => {
       :loading="loading"
       :saving="saving"
       @open="openWorkspace"
+      @toggle-star="toggleWorkspaceStar"
       @create="createWorkspace"
       @delete="deleteWorkspace"
       @library="backToLibrary"
@@ -1058,6 +1174,29 @@ onBeforeUnmount(() => {
           <p>
             文件树与代码区支持玻璃主题，拖拽、重命名与保存联动。
           </p>
+          <div class="meta-edit-row">
+            <button
+              type="button"
+              class="meta-action-button"
+              data-testid="workspace-star-toggle"
+              :disabled="!currentWorkspace || saving"
+              @click="currentWorkspace && toggleWorkspaceStar(currentWorkspace.id)"
+            >
+              {{ currentWorkspace?.starred ? '取消收藏工作区' : '收藏工作区' }}
+            </button>
+            <label class="meta-tag-editor">
+              <span>工作区标签</span>
+              <input
+                v-model="workspaceTagsInput"
+                data-testid="workspace-tags-input"
+                type="text"
+                placeholder="以逗号分隔，例如 backend, api"
+                :disabled="!currentWorkspace || saving"
+                @blur="commitWorkspaceTags"
+                @keydown="onWorkspaceTagsKeydown"
+              >
+            </label>
+          </div>
         </article>
 
         <div class="workspace-main">
@@ -1139,6 +1278,27 @@ onBeforeUnmount(() => {
                     快照
                   </button>
                 </div>
+                <button
+                  type="button"
+                  class="editor-tool-button"
+                  data-testid="file-star-toggle"
+                  :disabled="!canUseEditorTools"
+                  @click="toggleActiveFileStar"
+                >
+                  {{ activeFile?.starred ? '取消收藏文件' : '收藏文件' }}
+                </button>
+                <label class="file-tag-editor">
+                  <span>文件标签</span>
+                  <input
+                    v-model="fileTagsInput"
+                    data-testid="file-tags-input"
+                    type="text"
+                    placeholder="以逗号分隔"
+                    :disabled="!canUseEditorTools"
+                    @blur="commitFileTags"
+                    @keydown="onFileTagsKeydown"
+                  >
+                </label>
                 <label class="theme-picker">
                   <span>主题</span>
                   <select v-model="editorTheme">
@@ -1729,6 +1889,45 @@ h2 {
   font-size: 12px;
 }
 
+.meta-edit-row {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.meta-action-button {
+  border: 1px solid var(--theme-accent-row-action-border);
+  background: var(--theme-accent-row-action-background);
+  color: var(--theme-accent-row-action-text);
+  border-radius: 9px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.meta-tag-editor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--theme-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.meta-tag-editor input,
+.file-tag-editor input {
+  border: 1px solid var(--theme-surface-input-border);
+  background: var(--theme-surface-input-background);
+  color: var(--theme-text-primary);
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: 12px;
+  min-width: 180px;
+}
+
 .workspace-grid {
   display: flex;
   flex-direction: column;
@@ -1832,6 +2031,7 @@ h2 {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .editor-tools {
@@ -1874,6 +2074,15 @@ h2 {
   border-radius: 8px;
   padding: 5px 8px;
   font-size: 12px;
+}
+
+.file-tag-editor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--theme-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .editor-tool-button {

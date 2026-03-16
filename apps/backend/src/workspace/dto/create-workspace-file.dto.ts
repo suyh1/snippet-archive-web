@@ -1,6 +1,7 @@
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsInt,
   IsOptional,
   IsString,
@@ -33,4 +34,8 @@ export class CreateWorkspaceFileDto {
   @ArrayMaxSize(50)
   @IsString({ each: true })
   tags?: string[]
+
+  @IsOptional()
+  @IsBoolean()
+  starred?: boolean
 }

@@ -150,6 +150,7 @@ describe('WorkspaceService', () => {
         language: 'typescript',
         content: '',
         tags: [],
+        starred: false,
         kind: 'file',
         order: 3,
       },

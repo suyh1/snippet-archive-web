@@ -125,6 +125,42 @@ describe('Workspace file API (e2e)', () => {
     expect(res.body.error.code).toBe('NOT_FOUND')
   })
 
+  it('updates file tags and starred state', async () => {
+    const workspace = await prisma.workspace.create({
+      data: {
+        title: 'Meta Workspace',
+        description: '',
+        tags: ['backend'],
+        starred: false,
+      },
+    })
+
+    const created = await request(app.getHttpServer())
+      .post(`/api/workspaces/${workspace.id}/files`)
+      .send({
+        name: 'token.ts',
+        path: '/src/token.ts',
+        language: 'typescript',
+        content: 'const token = 1',
+        kind: 'file',
+        order: 1,
+      })
+
+    expect(created.status).toBe(201)
+
+    const fileId = created.body.data.id
+    const patchRes = await request(app.getHttpServer())
+      .patch(`/api/workspaces/${workspace.id}/files/${fileId}`)
+      .send({
+        tags: ['backend', 'security'],
+        starred: true,
+      })
+
+    expect(patchRes.status).toBe(200)
+    expect(patchRes.body.data.tags).toEqual(['backend', 'security'])
+    expect(patchRes.body.data.starred).toBe(true)
+  })
+
   it('moves a file into another folder and keeps sibling order normalized', async () => {
     const workspace = await prisma.workspace.create({
       data: {

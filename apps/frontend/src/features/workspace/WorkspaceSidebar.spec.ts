@@ -18,7 +18,7 @@ describe('WorkspaceSidebar', () => {
     expect(wrapper.emitted('create')).toEqual([['New Workspace']])
   })
 
-  it('emits open and delete for workspace actions', async () => {
+  it('emits open, toggleStar and delete for workspace actions', async () => {
     const wrapper = mount(WorkspaceSidebar, {
       props: {
         workspaces: [
@@ -35,9 +35,11 @@ describe('WorkspaceSidebar', () => {
     })
 
     await wrapper.find('.open-button').trigger('click')
+    await wrapper.find('.star-button').trigger('click')
     await wrapper.find('.delete-button').trigger('click')
 
     expect(wrapper.emitted('open')).toEqual([['w1']])
+    expect(wrapper.emitted('toggleStar')).toEqual([['w1']])
     expect(wrapper.emitted('delete')).toEqual([['w1']])
   })
 

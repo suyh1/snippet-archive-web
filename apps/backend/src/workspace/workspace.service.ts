@@ -97,6 +97,7 @@ export class WorkspaceService {
         language: dto.language,
         content: dto.content ?? '',
         tags: dto.tags ?? [],
+        starred: dto.starred ?? false,
         kind: dto.kind,
         order: dto.order,
       },
