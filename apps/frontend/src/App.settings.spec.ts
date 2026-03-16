@@ -21,6 +21,7 @@ vi.mock('@/api/workspaces', () => {
 
 import SettingsPage from '@/pages/SettingsPage.vue'
 import { workspaceApi } from '@/api/workspaces'
+import { getDefaultUiTheme } from '@/themes/theme-runtime'
 
 describe('Settings page', () => {
   beforeEach(() => {
@@ -58,7 +59,15 @@ describe('Settings page', () => {
     const themeTutorial = wrapper.get('[data-testid="settings-theme-tutorial"]')
     expect(themeTutorial.text()).toContain('schemaVersion')
     expect(themeTutorial.text()).toContain('modules')
+    expect(themeTutorial.text()).toContain('surface.toolbarGlassBackground')
+    expect(themeTutorial.text()).toContain('surface.toolbarGlassHighlightArc')
     expect(themeTutorial.text()).toContain('推荐编写步骤')
+
+    await wrapper.get('[data-testid="settings-tab-shortcuts"]').trigger('click')
+    expect(wrapper.find('[data-testid="settings-panel-shortcuts"]').exists()).toBe(true)
+    const shortcutPanel = wrapper.get('[data-testid="settings-panel-shortcuts"]')
+    expect(shortcutPanel.text()).toContain('Ctrl/Cmd + Shift + K')
+    expect(shortcutPanel.text()).toContain('Ctrl/Cmd + S')
 
     await wrapper.get('[data-testid="settings-tab-languages"]').trigger('click')
     expect(wrapper.find('[data-testid="settings-panel-languages"]').exists()).toBe(true)
@@ -134,5 +143,46 @@ describe('Settings page', () => {
     expect(document.documentElement.style.getPropertyValue('--theme-layout-app-shell-background')).toBe(
       'linear-gradient(160deg, #fee2e2 0%, #fecaca 52%, #fda4af 100%)',
     )
+  })
+
+  it('shows actionable error when toolbar theme tokens are missing on import', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+
+    const wrapper = mount(SettingsPage, {
+      global: {
+        plugins: [pinia],
+      },
+    })
+
+    await wrapper.get('[data-testid="settings-tab-themes"]').trigger('click')
+    await vi.waitFor(() => {
+      expect(wrapper.find('[data-testid="settings-theme-panel"]').exists()).toBe(true)
+    })
+
+    const invalidTheme = getDefaultUiTheme()
+    invalidTheme.meta.id = 'broken-toolbar-theme'
+    invalidTheme.meta.name = 'Broken Toolbar Theme'
+    delete (invalidTheme.modules.surface as Record<string, string>).toolbarGlassBackground
+
+    const input = wrapper.get('[data-testid="settings-theme-import-input"]')
+    const file = new File([JSON.stringify(invalidTheme, null, 2)], 'broken-toolbar-theme.json', {
+      type: 'application/json',
+    })
+    Object.defineProperty(input.element, 'files', {
+      configurable: true,
+      value: [file],
+    })
+    await input.trigger('change')
+
+    await vi.waitFor(() => {
+      expect(wrapper.get('[data-testid="settings-theme-import-message"]').text()).toContain(
+        '缺少浮动工具栏 token',
+      )
+    })
+
+    const message = wrapper.get('[data-testid="settings-theme-import-message"]').text()
+    expect(message).toContain('surface.toolbarGlassBackground')
+    expect(message).toContain('surface.toolbarGlass* / surface.toolbarLink* / surface.toolbarCapture*')
   })
 })

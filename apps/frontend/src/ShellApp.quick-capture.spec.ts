@@ -49,7 +49,54 @@ describe('Shell quick capture', () => {
     setActivePinia(createPinia())
   })
 
-  it('opens by shortcut and creates snippet then navigates to workspace context', async () => {
+  it('stays hidden by default and can be opened from icon action', async () => {
+    vi.mocked(workspaceApi.list).mockResolvedValue([
+      {
+        id: 'w1',
+        title: 'Quick Capture WS',
+        description: '',
+        tags: [],
+        starred: false,
+      },
+    ])
+
+    const router = createTestRouter()
+    await router.push('/workspace')
+    await router.isReady()
+
+    const wrapper = mount(ShellApp, {
+      global: {
+        plugins: [createPinia(), router],
+        stubs: {
+          teleport: true,
+        },
+      },
+    })
+
+    expect(wrapper.find('[data-testid="floating-toolbar"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="quick-capture-dialog"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="toolbar-toggle"]').trigger('click')
+    expect(wrapper.find('[data-testid="floating-toolbar"]').exists()).toBe(true)
+
+    await wrapper.get('[data-testid="quick-capture-open"]').trigger('click')
+
+    await vi.waitFor(() => {
+      expect(wrapper.find('[data-testid="quick-capture-dialog"]').exists()).toBe(true)
+    })
+
+    await wrapper.get('[data-testid="quick-capture-cancel"]').trigger('click')
+    expect(wrapper.find('[data-testid="quick-capture-dialog"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="toolbar-toggle"]').trigger('click')
+    expect(wrapper.find('[data-testid="floating-toolbar"]').exists()).toBe(true)
+    window.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    await vi.waitFor(() => {
+      expect(wrapper.find('[data-testid="floating-toolbar"]').exists()).toBe(false)
+    })
+  })
+
+  it('opens toolbar by shortcut and creates snippet then navigates to workspace context', async () => {
     vi.mocked(workspaceApi.list).mockResolvedValue([
       {
         id: 'w1',
@@ -92,6 +139,11 @@ describe('Shell quick capture', () => {
         shiftKey: true,
       }),
     )
+
+    await vi.waitFor(() => {
+      expect(wrapper.find('[data-testid="floating-toolbar"]').exists()).toBe(true)
+    })
+    await wrapper.get('[data-testid="quick-capture-open"]').trigger('click')
 
     await vi.waitFor(() => {
       expect(wrapper.find('[data-testid="quick-capture-dialog"]').exists()).toBe(true)

@@ -60,6 +60,8 @@ test('favorites flow: star workspace/file and filter by tag', async ({ page, req
   await page.getByTestId('workspace-tags-input').fill('backend, team')
   await page.getByTestId('tree-row').filter({ hasText: '/src/token.ts' }).first().click()
 
+  await page.getByTestId('toolbar-toggle').click()
+  await expect(page.getByTestId('floating-toolbar')).toBeVisible()
   await page.getByTestId('nav-favorites').click()
   await expect(page.getByTestId('favorites-page')).toBeVisible()
 

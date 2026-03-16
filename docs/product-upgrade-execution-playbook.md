@@ -444,6 +444,56 @@ A6 完成标记：
    - `npm run typecheck --workspace @snippet-archive/frontend`
    - `npm run build`
 
+### 2026-03-16｜阶段一补充（快速捕捉悬浮栏 + 设置快捷键页）
+
+1. 目标：补充阶段一交互细节，优化快速捕捉入口形态并完善设置页快捷键信息展示。
+2. 结果：
+   - 浮动工具栏：原右下角“工作区/搜索/收藏/快速捕捉”工作栏改为默认隐藏的中上方悬浮工具栏，支持 `Ctrl/Cmd + Shift + K` 与右上角图标唤出，`Esc` 收起。
+   - 快速捕捉：保留弹层表单能力，改为通过浮动工具栏中的“快速捕捉”入口打开。
+   - 设置入口：工作台右上角“设置/返回”按钮改为图标形式。
+   - 设置页：新增“快捷键”Tab，集中展示当前项目已接入的快捷键与作用范围。
+   - 主题能力：浮动工具栏玻璃样式完成 token 化，新增 `surface.toolbar*` 相关 token，并同步到 9 套内置主题；e2e 增加“切换主题时工具栏样式跟随变化”断言。
+   - 回归：补充 quick capture、favorites 与 settings 的单测/E2E 断言，覆盖点击、快捷键、几何定位与 tab 切换。
+3. 验证命令（均通过）：
+   - `npm run test:run --workspace @snippet-archive/frontend -- src/ShellApp.quick-capture.spec.ts src/App.settings.spec.ts`
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend -- e2e/quick-capture.spec.ts e2e/settings-languages.spec.ts`
+   - `npm run test --workspace @snippet-archive/backend`
+   - `npm run test:e2e --workspace @snippet-archive/backend`
+   - `npm run test:run --workspace @snippet-archive/frontend`
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
+   - `npm run typecheck --workspace @snippet-archive/frontend`
+   - `npm run build`
+
+### 2026-03-17｜阶段一补充（工具栏主题独立调参与教程更新）
+
+1. 目标：让浮动工具栏玻璃样式在每套内置主题下具备独立参数，并确保该能力在主题导入/导出教程中可被正确使用。
+2. 结果：
+   - 主题参数：9 套内置主题的 `surface.toolbarGlass*`、`surface.toolbarLink*`、`surface.toolbarCapture*` 调整为按主题独立调参，不再共享同一套玻璃参数。
+   - 可验证性：新增 `theme-runtime` 回归断言，要求所有内置主题的 `toolbarGlassBackground` 与 `toolbarGlassShadow` 都是主题专属值。
+   - 教程更新：设置页“主题编写教程”新增“浮动工具栏关键 token（支持导入/导出）”区块，补充 `surface.toolbarGlassBackground`、`surface.toolbarGlassHighlightArc` 等关键字段及导入/导出约束说明。
+3. 验证命令（均通过）：
+   - `npm run test:run --workspace @snippet-archive/frontend -- src/App.settings.spec.ts src/themes/theme-runtime.spec.ts`
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend -- e2e/settings-languages.spec.ts e2e/quick-capture.spec.ts`
+   - `npm run check:theme-contract --workspace @snippet-archive/frontend`
+
+### 2026-03-17｜阶段一补充（主题导入错误提示优化）
+
+1. 目标：让主题导入失败时的错误提示可直接指导修复，尤其是浮动工具栏 token 缺失场景。
+2. 结果：
+   - 导入提示：在设置页导入流程中，对 `surface.toolbar*` 缺失/空值错误给出专属可操作提示，明确缺失字段并提示应补齐的 token 组。
+   - 导入提示：当 `modules.surface` 整体缺失时，提示用户基于“导出主题文件”模板保留完整模块结构后再导入。
+   - 回归覆盖：新增设置页单测，验证缺失 `surface.toolbarGlassBackground` 时会出现“缺少浮动工具栏 token”提示；E2E 增加缺少 `surface` 模块的导入失败提示断言。
+3. 验证命令（均通过）：
+   - `npm run test:run --workspace @snippet-archive/frontend -- src/App.settings.spec.ts`
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend -- e2e/settings-languages.spec.ts`
+   - `npm run check:theme-contract --workspace @snippet-archive/frontend`
+   - `npm run test --workspace @snippet-archive/backend`
+   - `npm run test:e2e --workspace @snippet-archive/backend`
+   - `npm run test:run --workspace @snippet-archive/frontend`
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
+   - `npm run typecheck --workspace @snippet-archive/frontend`
+   - `npm run build`
+
 ## 12. 阶段一执行细化（线程 B：标签与收藏）
 
 ### 12.1 线程目标

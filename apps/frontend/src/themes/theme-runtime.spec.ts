@@ -4,6 +4,7 @@ import {
   applyBuiltinUiTheme,
   getActiveUiTheme,
   getBuiltinUiThemeCatalog,
+  getBuiltinUiThemeFiles,
   getDefaultUiTheme,
   importUiThemeFile,
   initializeUiTheme,
@@ -70,6 +71,16 @@ describe('theme runtime', () => {
 
     const invalidSwitch = applyBuiltinUiTheme('missing-theme')
     expect(invalidSwitch.ok).toBe(false)
+  })
+
+  it('ships preset-specific floating toolbar glass tokens', () => {
+    const themes = getBuiltinUiThemeFiles()
+
+    const toolbarBackgrounds = themes.map((theme) => theme.modules.surface.toolbarGlassBackground)
+    const toolbarShadows = themes.map((theme) => theme.modules.surface.toolbarGlassShadow)
+
+    expect(new Set(toolbarBackgrounds).size).toBe(themes.length)
+    expect(new Set(toolbarShadows).size).toBe(themes.length)
   })
 
   it('rejects invalid theme file and keeps current theme', async () => {

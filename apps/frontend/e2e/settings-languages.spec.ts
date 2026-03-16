@@ -64,6 +64,13 @@ test('settings page shows language list and supports tab switching', async ({ pa
   await expect(themeTutorial).toBeVisible()
   await expect(themeTutorial).toContainText('schemaVersion')
   await expect(themeTutorial).toContainText('modules')
+  await expect(themeTutorial).toContainText('surface.toolbarGlassBackground')
+  await expect(themeTutorial).toContainText('surface.toolbarGlassHighlightArc')
+
+  await page.getByTestId('settings-tab-shortcuts').click()
+  await expect(page.getByTestId('settings-panel-shortcuts')).toBeVisible()
+  await expect(page.getByTestId('settings-panel-shortcuts')).toContainText('Ctrl/Cmd + Shift + K')
+  await expect(page.getByTestId('settings-panel-shortcuts')).toContainText('Ctrl/Cmd + S')
 
   await page.getByTestId('settings-tab-languages').click()
   await expect(page.getByTestId('settings-panel-languages')).toBeVisible()
@@ -204,6 +211,16 @@ test('settings themes tab supports import/export and keyboard flows', async ({ p
   await page.keyboard.press('Enter')
 
   await expect(page.getByTestId('settings-theme-current-id')).toContainText('glass-gradient')
+
+  delete (exportedTheme.modules as Record<string, unknown>).surface
+  await page.setInputFiles('[data-testid="settings-theme-import-input"]', {
+    name: 'broken-theme.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(exportedTheme, null, 2)),
+  })
+  await expect(page.getByTestId('settings-theme-import-message')).toContainText(
+    '缺少 surface 模块',
+  )
 })
 
 test('themes tab can cycle all built-in presets and apply immediately', async ({ page }) => {
@@ -224,6 +241,7 @@ test('themes tab can cycle all built-in presets and apply immediately', async ({
   ]
 
   let previousShellBackground = ''
+  let previousToolbarBackground = ''
   for (const presetId of presetIds) {
     await page.getByTestId('settings-theme-preset-select').selectOption(presetId)
     await expect(page.getByTestId('settings-theme-current-id')).toContainText(presetId)
@@ -244,6 +262,21 @@ test('themes tab can cycle all built-in presets and apply immediately', async ({
       expect(appliedState.shellBackground).not.toBe(previousShellBackground)
     }
     previousShellBackground = appliedState.shellBackground
+
+    await page.getByTestId('toolbar-toggle').click()
+    await expect(page.getByTestId('floating-toolbar')).toBeVisible()
+
+    const toolbarBackground = await page.getByTestId('floating-toolbar').evaluate((node) => {
+      return getComputedStyle(node as HTMLElement).backgroundImage
+    })
+    expect(toolbarBackground).not.toBe('')
+    if (previousToolbarBackground) {
+      expect(toolbarBackground).not.toBe(previousToolbarBackground)
+    }
+    previousToolbarBackground = toolbarBackground
+
+    await page.keyboard.press('Escape')
+    await expect(page.getByTestId('floating-toolbar')).toHaveCount(0)
   }
 
   await page.reload()

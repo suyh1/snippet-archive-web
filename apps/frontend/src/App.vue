@@ -129,7 +129,16 @@ const statusLanguageLabel = computed(() => {
   return getLanguageLabel(language)
 })
 type AppView = 'workspace' | 'settings'
-type SettingsTab = 'general' | 'themes' | 'languages'
+type SettingsTab = 'general' | 'themes' | 'shortcuts' | 'languages'
+type SettingsShortcutGroup = {
+  id: string
+  title: string
+  items: Array<{
+    keys: string
+    action: string
+    scope: string
+  }>
+}
 const props = withDefaults(
   defineProps<{
     initialView?: AppView
@@ -196,7 +205,14 @@ const themeTutorialJsonTemplate = `{
   "modules": {
     "layout": {},
     "text": {},
-    "surface": {},
+    "surface": {
+      "toolbarGlassBackground": "radial-gradient(...), var(--theme-surface-glass-header-background)",
+      "toolbarGlassShadow": "0 20px 40px rgba(...)",
+      "toolbarGlassHighlightArc": "radial-gradient(...)",
+      "toolbarGlassTintOverlay": "radial-gradient(...)",
+      "toolbarLinkBackground": "rgba(...)",
+      "toolbarLinkActiveBackground": "rgba(...)"
+    },
     "accent": {},
     "danger": {}
   }
@@ -214,8 +230,8 @@ const themeTutorialModules = [
   },
   {
     id: 'surface',
-    description: '面板、卡片、输入框、标签等表面层样式。',
-    tokenExample: 'surface.glassPanelBackground',
+    description: '面板与浮动工具栏玻璃层样式（背景、阴影、高光与按钮态）。',
+    tokenExample: 'surface.toolbarGlassBackground / surface.toolbarGlassShadow',
   },
   {
     id: 'accent',
@@ -231,13 +247,113 @@ const themeTutorialModules = [
 const themeTutorialSteps = [
   '先在本页导出当前主题文件，作为模板起点。',
   '复制模板后仅修改 meta.id / meta.name，先保证文件可导入。',
-  '优先小步调整 layout 与 accent，便于快速看到全局变化。',
+  '优先调整 surface.toolbarGlassBackground 与 surface.toolbarGlassShadow，确定整体玻璃基调。',
+  '再补 surface.toolbarGlassHighlightArc 与 surface.toolbarGlassTintOverlay，做顶部高光与色彩采样偏移。',
+  '最后微调 toolbarLink* / toolbarCapture*，保证悬浮工具栏与页面主按钮体系一致。',
   '完成后导入 JSON，系统会立刻应用并写入全局主题。',
 ]
 const themeTutorialRules = [
   'schemaVersion 必须是 1。',
   'meta.id 与 meta.name 必填，modules 下五个分组必须齐全。',
+  '导入/导出都是完整主题文件，surface 下 toolbarGlass* / toolbarLink* / toolbarCapture* 必须保留。',
   '每个 token 值都应为非空字符串，推荐使用 #hex / rgba / gradient。',
+]
+const themeToolbarTokenHighlights = [
+  {
+    token: 'surface.toolbarGlassBackground',
+    description: '工具栏主体玻璃底色，可叠加两层背景色彩采样偏移。',
+  },
+  {
+    token: 'surface.toolbarGlassHighlightArc',
+    description: '顶部高光弧线，决定“玻璃顶光”强度与范围。',
+  },
+  {
+    token: 'surface.toolbarGlassTintOverlay',
+    description: '冷暖偏色覆盖层，建议使用低透明度 radial-gradient。',
+  },
+  {
+    token: 'surface.toolbarGlassShadow',
+    description: '外阴影 + 内阴影组合，控制悬浮层厚度与层次感。',
+  },
+  {
+    token: 'surface.toolbarLinkBackground',
+    description: '工具栏普通按钮底色，可与主题中性按钮做关联。',
+  },
+  {
+    token: 'surface.toolbarLinkActiveBackground',
+    description: '工具栏选中态底色，建议与 accent.selected 保持语义一致。',
+  },
+]
+const settingsShortcutGroups: SettingsShortcutGroup[] = [
+  {
+    id: 'global',
+    title: '全局',
+    items: [
+      {
+        keys: 'Ctrl/Cmd + Shift + K',
+        action: '唤出或收起浮动工具栏',
+        scope: '任意页面',
+      },
+      {
+        keys: 'Esc',
+        action: '关闭浮动工具栏或快速捕捉面板',
+        scope: '浮动层已打开时',
+      },
+    ],
+  },
+  {
+    id: 'editor',
+    title: '编辑器',
+    items: [
+      {
+        keys: 'Ctrl/Cmd + S',
+        action: '保存当前文件',
+        scope: '代码编辑器聚焦时',
+      },
+      {
+        keys: 'Enter',
+        action: '确认标签编辑（工作区/文件）',
+        scope: '标签输入框',
+      },
+      {
+        keys: 'Esc',
+        action: '取消标签编辑并回退',
+        scope: '标签输入框',
+      },
+    ],
+  },
+  {
+    id: 'tree',
+    title: '文件树',
+    items: [
+      {
+        keys: 'Enter',
+        action: '确认新建或重命名',
+        scope: '文件树草稿输入框',
+      },
+      {
+        keys: 'Esc',
+        action: '取消新建或重命名',
+        scope: '文件树草稿输入框',
+      },
+    ],
+  },
+  {
+    id: 'search-and-settings',
+    title: '搜索与设置',
+    items: [
+      {
+        keys: 'Enter',
+        action: '提交搜索关键词或主题导出名',
+        scope: '搜索输入框 / 主题导出文件名输入框',
+      },
+      {
+        keys: 'Esc',
+        action: '清空输入或回退当前编辑',
+        scope: '搜索输入框 / 主题导出文件名输入框 / 收藏标签输入框',
+      },
+    ],
+  },
 ]
 
 const currentThemeMetaText = computed(() => {
@@ -317,6 +433,28 @@ function openThemeImportPicker() {
   themeImportInputRef.value?.click()
 }
 
+function formatThemeImportError(error: string) {
+  const missingToolbarTokenMatch = error.match(
+    /^缺少 token：modules\.surface\.(toolbar[A-Za-z0-9_]+)。$/,
+  )
+  if (missingToolbarTokenMatch) {
+    return `导入失败：缺少浮动工具栏 token（surface.${missingToolbarTokenMatch[1]}）。请基于“导出主题文件”模板补齐 surface.toolbarGlass* / surface.toolbarLink* / surface.toolbarCapture*。`
+  }
+
+  const emptyToolbarTokenMatch = error.match(
+    /^token 必须为非空字符串：modules\.surface\.(toolbar[A-Za-z0-9_]+)。$/,
+  )
+  if (emptyToolbarTokenMatch) {
+    return `导入失败：浮动工具栏 token 不能为空（surface.${emptyToolbarTokenMatch[1]}）。请检查 surface.toolbarGlass* / surface.toolbarLink* / surface.toolbarCapture*。`
+  }
+
+  if (error === '缺少模块：modules.surface。') {
+    return '导入失败：缺少 surface 模块。请使用“导出主题文件”生成模板，并保留完整 modules 结构后再导入。'
+  }
+
+  return `导入失败：${error}`
+}
+
 async function handleThemeImport(event: Event) {
   const target = event.target as HTMLInputElement | null
   const file = target?.files?.[0]
@@ -326,7 +464,7 @@ async function handleThemeImport(event: Event) {
 
   const result = await importUiThemeFile(file)
   if (!result.ok) {
-    themeFeedbackMessage.value = `导入失败：${result.error}`
+    themeFeedbackMessage.value = formatThemeImportError(result.error)
     if (target) {
       target.value = ''
     }
@@ -980,20 +1118,32 @@ onBeforeUnmount(() => {
           <button
             v-if="isSettingsView"
             type="button"
-            class="head-action-button"
+            class="head-action-icon"
             data-testid="back-to-workspace"
+            aria-label="返回工作台"
+            title="返回工作台"
             @click="backToWorkspaceView"
           >
-            返回工作台
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M7.8 4.6a.9.9 0 0 1 1.3 1.2L5.8 9.1h9.3a.9.9 0 1 1 0 1.8H5.8l3.3 3.3a.9.9 0 0 1-1.3 1.2L3 10.6a.9.9 0 0 1 0-1.2l4.8-4.8Z" />
+            </svg>
+            <span class="sr-only">返回工作台</span>
           </button>
           <button
             v-else
             type="button"
-            class="head-action-button"
+            class="head-action-icon"
             data-testid="open-settings"
+            aria-label="打开设置"
+            title="打开设置"
             @click="openSettings"
           >
-            设置
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path
+                d="M9.9 2.2a.9.9 0 0 1 1.8 0l.2 1.4a6.8 6.8 0 0 1 1.8.8l1.2-.7a.9.9 0 0 1 1.2.3l.9 1.5a.9.9 0 0 1-.3 1.2l-1.1.7a7.6 7.6 0 0 1 0 2l1.1.7a.9.9 0 0 1 .3 1.2l-.9 1.5a.9.9 0 0 1-1.2.3l-1.2-.7a6.8 6.8 0 0 1-1.8.8l-.2 1.4a.9.9 0 0 1-1.8 0l-.2-1.4a6.8 6.8 0 0 1-1.8-.8l-1.2.7a.9.9 0 0 1-1.2-.3l-.9-1.5a.9.9 0 0 1 .3-1.2l1.1-.7a7.6 7.6 0 0 1 0-2l-1.1-.7a.9.9 0 0 1-.3-1.2l.9-1.5a.9.9 0 0 1 1.2-.3l1.2.7a6.8 6.8 0 0 1 1.8-.8l.2-1.4Zm1 4.9a2.9 2.9 0 1 0 0 5.8 2.9 2.9 0 0 0 0-5.8Z"
+              />
+            </svg>
+            <span class="sr-only">打开设置</span>
           </button>
         </div>
       </header>
@@ -1009,7 +1159,7 @@ onBeforeUnmount(() => {
       >
         <article class="summary-card summary-compact">
           <h3>设置中心</h3>
-          <p>管理编辑器能力与展示信息。你可以在这里查看当前支持的全部语言。</p>
+          <p>管理编辑器能力与展示信息，包含主题、快捷键与完整语言清单。</p>
         </article>
 
         <section class="settings-panel">
@@ -1031,6 +1181,15 @@ onBeforeUnmount(() => {
               @click="switchSettingsTab('themes')"
             >
               主题
+            </button>
+            <button
+              type="button"
+              class="settings-tab-button"
+              data-testid="settings-tab-shortcuts"
+              :aria-selected="settingsTab === 'shortcuts'"
+              @click="switchSettingsTab('shortcuts')"
+            >
+              快捷键
             </button>
             <button
               type="button"
@@ -1161,6 +1320,19 @@ onBeforeUnmount(() => {
                 </div>
 
                 <div class="theme-tutorial-section">
+                  <h6>浮动工具栏关键 token（支持导入/导出）</h6>
+                  <ul class="theme-tutorial-list">
+                    <li
+                      v-for="item in themeToolbarTokenHighlights"
+                      :key="item.token"
+                    >
+                      <code>{{ item.token }}</code>
+                      <span>{{ item.description }}</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div class="theme-tutorial-section">
                   <h6>推荐编写步骤</h6>
                   <ol class="theme-tutorial-steps">
                     <li
@@ -1193,6 +1365,32 @@ onBeforeUnmount(() => {
                 {{ themeFeedbackMessage }}
               </p>
             </article>
+          </section>
+
+          <section
+            v-else-if="settingsTab === 'shortcuts'"
+            class="settings-tab-panel settings-shortcuts-tab-panel"
+            data-testid="settings-panel-shortcuts"
+          >
+            <p>以下为当前项目内已接入并可直接使用的快捷键清单。</p>
+            <div class="shortcut-groups">
+              <article
+                v-for="group in settingsShortcutGroups"
+                :key="group.id"
+                class="shortcut-group"
+              >
+                <h4>{{ group.title }}</h4>
+                <ul class="shortcut-list">
+                  <li v-for="item in group.items" :key="`${group.id}-${item.keys}-${item.action}`">
+                    <code>{{ item.keys }}</code>
+                    <div>
+                      <strong>{{ item.action }}</strong>
+                      <span>{{ item.scope }}</span>
+                    </div>
+                  </li>
+                </ul>
+              </article>
+            </div>
           </section>
 
           <section
@@ -1587,15 +1785,36 @@ h2 {
   font-weight: 600;
 }
 
-.head-action-button {
+.head-action-icon {
+  width: 36px;
+  height: 36px;
   border: 1px solid var(--theme-accent-primary-button-border);
   background: var(--theme-surface-ghost-button-background);
   color: var(--theme-text-primary);
-  border-radius: 9px;
-  padding: 7px 10px;
+  border-radius: 999px;
+  padding: 0;
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.head-action-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .error-banner {
@@ -1904,6 +2123,68 @@ h2 {
   color: var(--theme-text-secondary);
   font-size: 12px;
   font-weight: 600;
+}
+
+.settings-shortcuts-tab-panel {
+  overflow: hidden;
+}
+
+.shortcut-groups {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  align-content: start;
+}
+
+.shortcut-group {
+  border: 1px solid var(--theme-surface-input-border);
+  border-radius: 10px;
+  background: var(--theme-surface-glass-card-background);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.shortcut-group h4 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--theme-text-primary);
+}
+
+.shortcut-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.shortcut-list li {
+  display: grid;
+  gap: 4px;
+}
+
+.shortcut-list code {
+  width: fit-content;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: var(--theme-text-primary);
+  background: var(--theme-surface-code-tag-background);
+}
+
+.shortcut-list strong {
+  display: block;
+  font-size: 12px;
+  color: var(--theme-text-primary);
+}
+
+.shortcut-list span {
+  font-size: 11px;
+  color: var(--theme-text-secondary);
 }
 
 .language-panel-head {

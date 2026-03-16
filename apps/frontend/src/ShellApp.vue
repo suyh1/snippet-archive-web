@@ -12,6 +12,9 @@ import {
 const route = useRoute()
 const router = useRouter()
 
+const toolbarOpen = ref(false)
+const floatingToolbarRef = ref<HTMLElement | null>(null)
+const topActionsRef = ref<HTMLElement | null>(null)
 const quickCaptureOpen = ref(false)
 const quickCaptureLoading = ref(false)
 const quickCaptureSubmitting = ref(false)
@@ -106,6 +109,7 @@ async function loadQuickCaptureWorkspaces() {
 }
 
 async function openQuickCaptureDialog() {
+  toolbarOpen.value = false
   quickCaptureOpen.value = true
   resetQuickCaptureForm()
   await loadQuickCaptureWorkspaces()
@@ -117,6 +121,32 @@ function closeQuickCaptureDialog() {
   }
 
   quickCaptureOpen.value = false
+}
+
+function toggleFloatingToolbar() {
+  toolbarOpen.value = !toolbarOpen.value
+}
+
+function handleToolbarOutsidePointerDown(event: MouseEvent) {
+  if (!toolbarOpen.value) {
+    return
+  }
+
+  const target = event.target
+  if (!(target instanceof Node)) {
+    toolbarOpen.value = false
+    return
+  }
+
+  if (floatingToolbarRef.value?.contains(target)) {
+    return
+  }
+
+  if (topActionsRef.value?.contains(target)) {
+    return
+  }
+
+  toolbarOpen.value = false
 }
 
 async function submitQuickCapture() {
@@ -175,6 +205,20 @@ async function submitQuickCapture() {
 }
 
 function handleGlobalQuickCaptureShortcut(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    if (quickCaptureOpen.value) {
+      event.preventDefault()
+      closeQuickCaptureDialog()
+      return
+    }
+
+    if (toolbarOpen.value) {
+      event.preventDefault()
+      toolbarOpen.value = false
+    }
+    return
+  }
+
   if (!(event.metaKey || event.ctrlKey)) {
     return
   }
@@ -188,21 +232,28 @@ function handleGlobalQuickCaptureShortcut(event: KeyboardEvent) {
   }
 
   event.preventDefault()
-  void openQuickCaptureDialog()
+  toggleFloatingToolbar()
 }
 
 onMounted(() => {
   window.addEventListener('keydown', handleGlobalQuickCaptureShortcut)
+  window.addEventListener('mousedown', handleToolbarOutsidePointerDown)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleGlobalQuickCaptureShortcut)
+  window.removeEventListener('mousedown', handleToolbarOutsidePointerDown)
 })
 </script>
 
 <template>
   <div class="route-shell" data-testid="route-shell">
-    <header class="route-shell-header">
+    <header
+      v-if="toolbarOpen"
+      ref="floatingToolbarRef"
+      class="route-shell-header"
+      data-testid="floating-toolbar"
+    >
       <h1>Snippet Archive</h1>
       <nav class="route-shell-nav" aria-label="主导航">
         <RouterLink
@@ -229,17 +280,9 @@ onBeforeUnmount(() => {
         >
           收藏
         </RouterLink>
-        <RouterLink
-          data-testid="nav-settings"
-          class="route-shell-link"
-          :class="{ active: isActive('/settings') }"
-          to="/settings"
-        >
-          设置
-        </RouterLink>
         <button
           type="button"
-          class="route-shell-action"
+          class="route-shell-link route-shell-capture-link"
           data-testid="quick-capture-open"
           @click="openQuickCaptureDialog"
         >
@@ -248,6 +291,39 @@ onBeforeUnmount(() => {
       </nav>
     </header>
 
+    <div
+      ref="topActionsRef"
+      class="route-shell-top-actions"
+    >
+      <RouterLink
+        data-testid="nav-settings"
+        class="route-shell-icon-action"
+        :class="{ active: isActive('/settings') }"
+        to="/settings"
+        aria-label="打开设置"
+        title="打开设置"
+      >
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <path
+            d="M9.9 2.2a.9.9 0 0 1 1.8 0l.2 1.4a6.8 6.8 0 0 1 1.8.8l1.2-.7a.9.9 0 0 1 1.2.3l.9 1.5a.9.9 0 0 1-.3 1.2l-1.1.7a7.6 7.6 0 0 1 0 2l1.1.7a.9.9 0 0 1 .3 1.2l-.9 1.5a.9.9 0 0 1-1.2.3l-1.2-.7a6.8 6.8 0 0 1-1.8.8l-.2 1.4a.9.9 0 0 1-1.8 0l-.2-1.4a6.8 6.8 0 0 1-1.8-.8l-1.2.7a.9.9 0 0 1-1.2-.3l-.9-1.5a.9.9 0 0 1 .3-1.2l1.1-.7a7.6 7.6 0 0 1 0-2l-1.1-.7a.9.9 0 0 1-.3-1.2l.9-1.5a.9.9 0 0 1 1.2-.3l1.2.7a6.8 6.8 0 0 1 1.8-.8l.2-1.4Zm1 4.9a2.9 2.9 0 1 0 0 5.8 2.9 2.9 0 0 0 0-5.8Z"
+          />
+        </svg>
+      </RouterLink>
+
+      <button
+        type="button"
+        class="route-shell-icon-action primary"
+        data-testid="toolbar-toggle"
+        aria-label="显示工具栏（Ctrl/Cmd + Shift + K）"
+        title="显示工具栏（Ctrl/Cmd + Shift + K）"
+        @click="toggleFloatingToolbar"
+      >
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M4.2 4.4a.9.9 0 0 1 .9-.9h9.8a.9.9 0 1 1 0 1.8H5.1a.9.9 0 0 1-.9-.9Zm0 5.6a.9.9 0 0 1 .9-.9h9.8a.9.9 0 1 1 0 1.8H5.1a.9.9 0 0 1-.9-.9Zm.9 4.7a.9.9 0 1 0 0 1.8h9.8a.9.9 0 1 0 0-1.8H5.1Z" />
+        </svg>
+      </button>
+    </div>
+
     <section class="route-shell-content">
       <RouterView />
     </section>
@@ -255,14 +331,18 @@ onBeforeUnmount(() => {
     <Teleport to="body">
       <div
         v-if="quickCaptureOpen"
-        class="quick-capture-overlay"
+        class="quick-capture-float"
         data-testid="quick-capture-dialog"
-        @click.self="closeQuickCaptureDialog"
       >
-        <section class="quick-capture-card" role="dialog" aria-modal="true" aria-label="快速捕获">
+        <section class="quick-capture-card" role="dialog" aria-modal="false" aria-label="快速捕获">
           <header class="quick-capture-head">
-            <h3>快速捕获</h3>
-            <p>快捷键：Ctrl/Cmd + Shift + K</p>
+            <div>
+              <h3>快速捕获</h3>
+              <p>先用 Ctrl/Cmd + Shift + K 唤出工具栏</p>
+            </div>
+            <button type="button" class="quick-capture-close" @click="closeQuickCaptureDialog">
+              关闭
+            </button>
           </header>
 
           <div class="quick-capture-body">
@@ -372,24 +452,55 @@ onBeforeUnmount(() => {
 
 .route-shell-header {
   position: fixed;
-  bottom: 10px;
-  right: 14px;
+  top: min(18vh, 136px);
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 20;
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 12px;
-  border: 1px solid var(--theme-surface-statusbar-border);
+  padding: 10px 14px;
+  border: 1px solid var(--theme-surface-toolbar-glass-border);
   border-radius: 999px;
-  background: var(--theme-surface-glass-header-background);
-  backdrop-filter: var(--theme-surface-overlay-blur);
+  background: var(--theme-surface-toolbar-glass-background);
+  -webkit-backdrop-filter: var(--theme-surface-toolbar-glass-backdrop-filter);
+  backdrop-filter: var(--theme-surface-toolbar-glass-backdrop-filter);
+  box-shadow: var(--theme-surface-toolbar-glass-shadow);
+  overflow: hidden;
+  isolation: isolate;
+  animation: toolbar-fade-in 0.16s ease-out;
+  color: var(--theme-surface-toolbar-title-text);
+}
+
+.route-shell-header::before {
+  content: '';
+  position: absolute;
+  left: -22%;
+  right: -22%;
+  top: -84px;
+  height: 146px;
+  background: var(--theme-surface-toolbar-glass-highlight-arc);
+  filter: blur(1.2px);
   pointer-events: none;
+}
+
+.route-shell-header::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--theme-surface-toolbar-glass-tint-overlay);
+  pointer-events: none;
+}
+
+.route-shell-header > * {
+  position: relative;
+  z-index: 1;
 }
 
 .route-shell-header h1 {
   font-size: 12px;
   margin: 0;
-  color: var(--theme-text-secondary);
+  color: var(--theme-surface-toolbar-title-text);
 }
 
 .route-shell-nav {
@@ -398,31 +509,83 @@ onBeforeUnmount(() => {
 }
 
 .route-shell-link {
-  pointer-events: auto;
   text-decoration: none;
-  border: 1px solid var(--theme-surface-neutral-button-border);
+  border: 1px solid var(--theme-surface-toolbar-link-border);
   border-radius: 999px;
   padding: 6px 12px;
-  color: var(--theme-text-secondary);
-  background: var(--theme-surface-neutral-button-background);
+  color: var(--theme-surface-toolbar-link-text);
+  background: var(--theme-surface-toolbar-link-background);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--theme-surface-toolbar-link-inset-shadow);
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    transform 120ms ease;
+}
+
+.route-shell-capture-link {
+  cursor: pointer;
+  font: inherit;
+  border-color: var(--theme-surface-toolbar-capture-border);
+  background: var(--theme-surface-toolbar-capture-background);
+}
+
+.route-shell-link:hover {
+  border-color: var(--theme-surface-toolbar-link-hover-border);
+  background: var(--theme-surface-toolbar-link-hover-background);
+  transform: translateY(-1px);
 }
 
 .route-shell-link.active {
-  color: var(--theme-accent-selected-text);
-  border-color: var(--theme-accent-selected-border);
-  background: var(--theme-surface-row-active-background);
+  color: var(--theme-surface-toolbar-link-active-text);
+  border-color: var(--theme-surface-toolbar-link-active-border);
+  background: var(--theme-surface-toolbar-link-active-background);
+  box-shadow: var(--theme-surface-toolbar-link-active-shadow);
 }
 
-.route-shell-action {
-  pointer-events: auto;
-  border: 1px solid var(--theme-accent-primary-button-border);
+.route-shell-top-actions {
+  position: fixed;
+  top: 12px;
+  right: 64px;
+  z-index: 25;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.route-shell-icon-action {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--theme-surface-statusbar-border);
   border-radius: 999px;
-  padding: 6px 12px;
-  color: var(--theme-accent-primary-button-text);
-  background: var(--theme-accent-primary-button-gradient);
+  background: var(--theme-surface-glass-header-background);
+  color: var(--theme-text-secondary);
+  backdrop-filter: var(--theme-surface-overlay-blur);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 700;
+  text-decoration: none;
+  padding: 0;
+}
+
+.route-shell-icon-action svg {
+  width: 17px;
+  height: 17px;
+  fill: currentColor;
+}
+
+.route-shell-icon-action.primary {
+  border-color: var(--theme-accent-primary-button-border);
+  background: var(--theme-accent-primary-button-gradient);
+  color: var(--theme-accent-primary-button-text);
+}
+
+.route-shell-icon-action.active {
+  border-color: var(--theme-accent-selected-border);
+  background: var(--theme-surface-row-active-background);
+  color: var(--theme-accent-selected-text);
 }
 
 .route-shell-content {
@@ -430,19 +593,18 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
-.quick-capture-overlay {
+.quick-capture-float {
   position: fixed;
-  inset: 0;
+  top: min(17vh, 140px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(680px, calc(100vw - 32px));
   z-index: 60;
-  display: grid;
-  place-items: center;
-  background: var(--theme-surface-overlay-strong-background);
-  backdrop-filter: var(--theme-surface-overlay-soft-blur);
 }
 
 .quick-capture-card {
-  width: min(680px, calc(100vw - 32px));
-  max-height: min(84vh, 760px);
+  width: 100%;
+  max-height: min(66vh, 500px);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto auto;
   gap: 10px;
@@ -459,10 +621,27 @@ onBeforeUnmount(() => {
   font-size: 18px;
 }
 
+.quick-capture-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .quick-capture-head p {
   margin: 4px 0 0;
   color: var(--theme-text-tertiary);
   font-size: 12px;
+}
+
+.quick-capture-close {
+  border: 1px solid var(--theme-surface-neutral-button-border);
+  background: var(--theme-surface-neutral-button-background);
+  color: var(--theme-text-secondary);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
 }
 
 .quick-capture-body {
@@ -531,5 +710,37 @@ onBeforeUnmount(() => {
 .quick-capture-actions button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+@media (max-width: 900px) {
+  .route-shell-header {
+    top: min(14vh, 90px);
+    padding: 7px 9px;
+  }
+
+  .route-shell-header h1 {
+    display: none;
+  }
+
+  .route-shell-link {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .route-shell-top-actions {
+    right: 52px;
+    top: 10px;
+  }
+}
+
+@keyframes toolbar-fade-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 </style>
