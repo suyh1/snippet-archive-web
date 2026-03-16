@@ -6,6 +6,7 @@ import type {
   EditorSnapshotSource,
   Workspace,
   WorkspaceFile,
+  WorkspaceFileRevision,
 } from '@/types/workspace'
 import { basename, getParentPath, joinPath, normalizePath } from '@/utils/path'
 import { resolveWorkspaceErrorMessage } from '@/utils/error-message'
@@ -748,6 +749,66 @@ export const useWorkspaceStore = defineStore('workspace', {
           error,
           '保存文件失败，请稍后重试。',
         )
+      } finally {
+        this.saving = false
+      }
+    },
+
+    async listActiveFileRevisions() {
+      const workspaceId = this.currentWorkspaceId
+      const active = this.files.find((item) => item.id === this.activeFileId)
+
+      if (!workspaceId || !active || active.kind !== 'file') {
+        return [] as WorkspaceFileRevision[]
+      }
+
+      this.errorMessage = null
+
+      try {
+        return await workspaceApi.listFileRevisions(workspaceId, active.id)
+      } catch (error) {
+        this.errorMessage = resolveWorkspaceErrorMessage(
+          error,
+          '加载版本历史失败，请稍后重试。',
+        )
+        return [] as WorkspaceFileRevision[]
+      }
+    },
+
+    async restoreActiveFileRevision(revisionId: string) {
+      const workspaceId = this.currentWorkspaceId
+      const active = this.files.find((item) => item.id === this.activeFileId)
+
+      if (!workspaceId || !active || active.kind !== 'file') {
+        return false
+      }
+
+      this.saving = true
+      this.errorMessage = null
+
+      try {
+        const restored = await workspaceApi.restoreFileRevision(
+          workspaceId,
+          active.id,
+          revisionId,
+        )
+
+        this.files = this.files.map((item) => (item.id === restored.id ? restored : item))
+
+        if (this.activeFileId === restored.id && restored.kind === 'file') {
+          this.draftContent = restored.content ?? ''
+          this.draftLanguage = this.resolveLanguageForFile(restored)
+          this.dirty = false
+          this.removeDraftCacheEntry(workspaceId, restored.id)
+        }
+
+        return true
+      } catch (error) {
+        this.errorMessage = resolveWorkspaceErrorMessage(
+          error,
+          '回滚版本失败，请稍后重试。',
+        )
+        return false
       } finally {
         this.saving = false
       }

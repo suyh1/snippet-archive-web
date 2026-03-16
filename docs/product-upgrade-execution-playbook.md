@@ -234,7 +234,7 @@
 1. 线程 A：搜索中心与搜索 API（✅ 已完成）。
 2. 线程 B：标签与收藏（✅ 已完成）。
 3. 线程 C：revision 后端模型 + API（✅ 已完成）。
-4. 线程 D：revision 前端面板 + 回滚（未开始）。
+4. 线程 D：revision 前端面板 + 回滚（✅ 已完成）。
 5. 线程 E：前端路由与 store 解耦（未开始）。
 6. 线程 F：账号与组织基础（未开始）。
 7. 线程 G：权限与分享链接（未开始）。
@@ -390,6 +390,22 @@ A6 完成标记：
    - `npm run typecheck --workspace @snippet-archive/frontend`
    - `npm run build`
 
+### 2026-03-16｜线程 D（完成）
+
+1. 目标：完成“revision 前端面板 + 回滚链路”并通过门禁。
+2. 结果：
+   - 前端 API：`workspaceApi` 新增 revision 列表与回滚调用。
+   - 状态层：`workspaceStore` 新增 `listActiveFileRevisions`、`restoreActiveFileRevision`，回滚后同步编辑器内容、语言、dirty 状态与草稿缓存。
+   - UI：新增 `RevisionDialog` 组件；编辑器工具区新增“版本”入口，支持查看版本列表与一键回滚。
+   - 测试：新增 revision store 单测与 e2e 回归，覆盖“打开面板 -> 查看列表 -> 回滚旧版本”完整链路。
+3. 验证命令（均通过）：
+   - `npm run test --workspace @snippet-archive/backend`
+   - `npm run test:e2e --workspace @snippet-archive/backend`
+   - `npm run test:run --workspace @snippet-archive/frontend`
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
+   - `npm run typecheck --workspace @snippet-archive/frontend`
+   - `npm run build`
+
 ## 12. 阶段一执行细化（线程 B：标签与收藏）
 
 ### 12.1 线程目标
@@ -472,4 +488,44 @@ C5 完成标记：
 ### 13.3 线程 C 当前状态
 
 1. 当前状态：✅ 已完成（线程 C 全部验收通过）。
+2. 当前阻塞：无。
+
+## 14. 阶段一执行细化（线程 D：revision 前端面板 + 回滚）
+
+### 14.1 线程目标
+
+1. 在工作台提供 revision 历史面板入口，支持查看版本列表。
+2. 支持在前端触发指定版本回滚，并将编辑器内容同步到回滚结果。
+3. 补齐 click/keyboard/focus-blur/state 相关回归测试与端到端验证。
+
+### 14.2 线程 D 小功能点清单（逐项打标）
+
+D0 文档与状态：
+- [x] D0-1：在线程总览中将线程 D 状态标记为“进行中”。
+- [x] D0-2：在本文件追加线程 D 细化清单与执行记录。
+
+D1 API 与状态接线：
+- [x] D1-1：前端 `workspaceApi` 新增 revision 列表/回滚调用。
+- [x] D1-2：`workspaceStore` 新增 revision 列表读取与回滚 action。
+
+D2 UI 与交互：
+- [x] D2-1：新增 `RevisionDialog` 组件展示版本列表。
+- [x] D2-2：在编辑器工具区新增 revision 入口按钮。
+- [x] D2-3：回滚后编辑器内容、语言与保存状态同步正确。
+
+D3 测试与验证：
+- [x] D3-1：新增/更新前端单测（先红后绿）。
+- [x] D3-2：新增/更新前端 e2e（先红后绿，覆盖回滚链路）。
+
+D4 验证门禁：
+- [x] D4-1：targeted 回归（frontend unit + e2e）通过。
+- [x] D4-2：full gate（backend/frontend test、typecheck、build）通过。
+
+D5 完成标记：
+- [x] D5-1：线程清单将“线程 D”标记为已完成。
+- [x] D5-2：追加线程 D 完成执行记录与命令证据。
+
+### 14.3 线程 D 当前状态
+
+1. 当前状态：✅ 已完成（线程 D 全部验收通过）。
 2. 当前阻塞：无。

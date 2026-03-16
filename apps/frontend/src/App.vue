@@ -7,12 +7,17 @@ import CodeEditor, {
 } from '@/features/workspace/CodeEditor.vue'
 import ConfirmDialog from '@/features/workspace/ConfirmDialog.vue'
 import FileTree from '@/features/workspace/FileTree.vue'
+import RevisionDialog from '@/features/workspace/RevisionDialog.vue'
 import SnapshotDialog from '@/features/workspace/SnapshotDialog.vue'
 import UnsavedChangesDialog from '@/features/workspace/UnsavedChangesDialog.vue'
 import WorkspaceSidebar from '@/features/workspace/WorkspaceSidebar.vue'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import { useWorkspaceStore } from '@/stores/workspace.store'
-import type { EditorSnapshot, WorkspaceFile } from '@/types/workspace'
+import type {
+  EditorSnapshot,
+  WorkspaceFile,
+  WorkspaceFileRevision,
+} from '@/types/workspace'
 import { formatSnippetContent } from '@/utils/formatter'
 import {
   getLanguageLabel,
@@ -90,6 +95,10 @@ const historyAvailability = ref({
 const snapshotDialogOpen = ref(false)
 const snapshotRestoring = ref(false)
 const snapshotItems = ref<EditorSnapshot[]>([])
+const revisionDialogOpen = ref(false)
+const revisionLoading = ref(false)
+const revisionRestoring = ref(false)
+const revisionItems = ref<WorkspaceFileRevision[]>([])
 const formatting = ref(false)
 const editorStatus = ref<EditorStatusPayload>({
   lineCount: 1,
@@ -691,6 +700,65 @@ function openSnapshotDialog() {
   snapshotDialogOpen.value = true
 }
 
+async function loadRevisionItemsForActiveFile() {
+  const activeId = activeFile.value?.id
+  if (!activeId) {
+    revisionItems.value = []
+    return
+  }
+
+  revisionLoading.value = true
+  try {
+    const items = await workspaceStore.listActiveFileRevisions()
+    if (activeFile.value?.id !== activeId) {
+      return
+    }
+
+    revisionItems.value = items
+  } finally {
+    if (activeFile.value?.id === activeId) {
+      revisionLoading.value = false
+    }
+  }
+}
+
+function openRevisionDialog() {
+  if (!canUseEditorTools.value) {
+    return
+  }
+
+  revisionDialogOpen.value = true
+  void loadRevisionItemsForActiveFile()
+}
+
+function closeRevisionDialog() {
+  if (revisionRestoring.value) {
+    return
+  }
+
+  revisionDialogOpen.value = false
+}
+
+function refreshRevisionDialog() {
+  void loadRevisionItemsForActiveFile()
+}
+
+async function restoreRevision(revisionId: string) {
+  if (revisionRestoring.value) {
+    return
+  }
+
+  revisionRestoring.value = true
+  const restored = await workspaceStore.restoreActiveFileRevision(revisionId)
+  revisionRestoring.value = false
+
+  if (!restored) {
+    return
+  }
+
+  revisionDialogOpen.value = false
+}
+
 function closeSnapshotDialog() {
   if (snapshotRestoring.value) {
     return
@@ -850,6 +918,10 @@ watch(
     historyAvailability.value = { canUndo: false, canRedo: false }
     snapshotDialogOpen.value = false
     snapshotItems.value = []
+    revisionDialogOpen.value = false
+    revisionLoading.value = false
+    revisionRestoring.value = false
+    revisionItems.value = []
     editorStatus.value = {
       lineCount: 1,
       cursorLine: 1,
@@ -1277,6 +1349,15 @@ onBeforeUnmount(() => {
                   >
                     快照
                   </button>
+                  <button
+                    type="button"
+                    class="editor-tool-button"
+                    data-testid="editor-revisions"
+                    :disabled="!canUseEditorTools"
+                    @click="openRevisionDialog"
+                  >
+                    版本
+                  </button>
                 </div>
                 <button
                   type="button"
@@ -1411,6 +1492,17 @@ onBeforeUnmount(() => {
       @close="closeSnapshotDialog"
       @create="createManualSnapshot"
       @restore="restoreSnapshot"
+    />
+
+    <RevisionDialog
+      :open="revisionDialogOpen"
+      :file-name="activeFile?.name ?? ''"
+      :revisions="revisionItems"
+      :loading="revisionLoading"
+      :restoring="revisionRestoring"
+      @close="closeRevisionDialog"
+      @refresh="refreshRevisionDialog"
+      @restore="restoreRevision"
     />
 
     <UnsavedChangesDialog

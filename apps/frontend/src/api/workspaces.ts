@@ -5,6 +5,7 @@ import type {
   MoveWorkspaceFileInput,
   Workspace,
   WorkspaceFile,
+  WorkspaceFileRevision,
 } from '@/types/workspace'
 
 export const workspaceApi = {
@@ -69,5 +70,18 @@ export const workspaceApi = {
     return apiRequest<{ id: string }>(`/workspaces/${workspaceId}/files/${fileId}`, {
       method: 'DELETE',
     })
+  },
+  listFileRevisions(workspaceId: string, fileId: string) {
+    return apiRequest<{ items: WorkspaceFileRevision[] }>(
+      `/workspaces/${workspaceId}/files/${fileId}/revisions`,
+    ).then((res) => res.items)
+  },
+  restoreFileRevision(workspaceId: string, fileId: string, revisionId: string) {
+    return apiRequest<WorkspaceFile>(
+      `/workspaces/${workspaceId}/files/${fileId}/revisions/${revisionId}/restore`,
+      {
+        method: 'POST',
+      },
+    )
   },
 }

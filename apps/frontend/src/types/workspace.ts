@@ -24,6 +24,19 @@ export type WorkspaceFile = {
   updatedAt?: string
 }
 
+export type WorkspaceFileRevisionSource = 'update' | 'restore'
+
+export type WorkspaceFileRevision = {
+  id: string
+  workspaceId: string
+  fileId: string
+  language: string
+  content: string
+  source: WorkspaceFileRevisionSource
+  summary: string
+  createdAt: string
+}
+
 export type CreateWorkspaceInput = {
   title: string
   description?: string

@@ -9,9 +9,11 @@ vi.mock('@/api/workspaces', () => {
       delete: vi.fn(),
       get: vi.fn(),
       listFiles: vi.fn(),
+      listFileRevisions: vi.fn(),
       createFile: vi.fn(),
       moveFile: vi.fn(),
       updateFile: vi.fn(),
+      restoreFileRevision: vi.fn(),
       deleteFile: vi.fn(),
     },
   }
@@ -323,5 +325,83 @@ describe('workspace store', () => {
     await store.createWorkspace('Workspace 1')
 
     expect(store.errorMessage).toBe('名称或路径已存在，请修改后重试。')
+  })
+
+  it('loads active file revisions from api', async () => {
+    const store = useWorkspaceStore()
+    store.currentWorkspaceId = 'w1'
+    store.files = [
+      {
+        id: 'f1',
+        workspaceId: 'w1',
+        name: 'main.ts',
+        path: '/main.ts',
+        language: 'typescript',
+        content: 'const version = 3',
+        kind: 'file',
+        order: 1,
+      },
+    ]
+    store.activeFileId = 'f1'
+
+    vi.mocked(workspaceApi.listFileRevisions).mockResolvedValue([
+      {
+        id: 'r1',
+        workspaceId: 'w1',
+        fileId: 'f1',
+        language: 'typescript',
+        content: 'const version = 3',
+        source: 'update',
+        summary: 'Updated: const version = 3',
+        createdAt: '2026-03-16T12:00:00.000Z',
+      },
+    ])
+
+    const revisions = await store.listActiveFileRevisions()
+
+    expect(workspaceApi.listFileRevisions).toHaveBeenCalledWith('w1', 'f1')
+    expect(revisions).toHaveLength(1)
+    expect(revisions[0]?.id).toBe('r1')
+  })
+
+  it('restores active file revision and syncs editor draft', async () => {
+    const store = useWorkspaceStore()
+    store.currentWorkspaceId = 'w1'
+    store.files = [
+      {
+        id: 'f1',
+        workspaceId: 'w1',
+        name: 'main.ts',
+        path: '/main.ts',
+        language: 'javascript',
+        content: 'const version = 3',
+        kind: 'file',
+        order: 1,
+      },
+    ]
+    store.activeFileId = 'f1'
+    store.draftContent = 'const version = 3'
+    store.draftLanguage = 'javascript'
+    store.dirty = true
+
+    vi.mocked(workspaceApi.restoreFileRevision).mockResolvedValue({
+      id: 'f1',
+      workspaceId: 'w1',
+      name: 'main.ts',
+      path: '/main.ts',
+      language: 'typescript',
+      content: 'const version = 2',
+      kind: 'file',
+      order: 1,
+    })
+
+    const restored = await store.restoreActiveFileRevision('r2')
+
+    expect(restored).toBe(true)
+    expect(workspaceApi.restoreFileRevision).toHaveBeenCalledWith('w1', 'f1', 'r2')
+    expect(store.files[0]?.content).toBe('const version = 2')
+    expect(store.draftContent).toBe('const version = 2')
+    expect(store.draftLanguage).toBe('typescript')
+    expect(store.dirty).toBe(false)
   })
 })
