@@ -1,18 +1,23 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { WorkspaceFileRevision } from '@/types/workspace'
+import { buildUnifiedLineDiff } from '@/utils/revision-diff'
 
 const props = withDefaults(
   defineProps<{
     open: boolean
     fileName?: string
     revisions?: WorkspaceFileRevision[]
+    currentContent?: string
+    currentLanguage?: string
     loading?: boolean
     restoring?: boolean
   }>(),
   {
     fileName: '',
     revisions: () => [],
+    currentContent: '',
+    currentLanguage: 'plaintext',
     loading: false,
     restoring: false,
   },
@@ -35,6 +40,50 @@ const sortedRevisions = computed(() => {
   })
 })
 
+const selectedRevisionId = ref<string | null>(null)
+
+watch(
+  [() => props.open, () => sortedRevisions.value],
+  ([open, revisions]) => {
+    if (!open) {
+      selectedRevisionId.value = null
+      return
+    }
+
+    if (revisions.length === 0) {
+      selectedRevisionId.value = null
+      return
+    }
+
+    if (!selectedRevisionId.value) {
+      selectedRevisionId.value = revisions[0]?.id ?? null
+      return
+    }
+
+    const exists = revisions.some((item) => item.id === selectedRevisionId.value)
+    if (!exists) {
+      selectedRevisionId.value = revisions[0]?.id ?? null
+    }
+  },
+  { immediate: true },
+)
+
+const selectedRevision = computed(() => {
+  if (!selectedRevisionId.value) {
+    return null
+  }
+
+  return sortedRevisions.value.find((item) => item.id === selectedRevisionId.value) ?? null
+})
+
+const diffRows = computed(() => {
+  if (!selectedRevision.value) {
+    return []
+  }
+
+  return buildUnifiedLineDiff(selectedRevision.value.content, props.currentContent)
+})
+
 function formatTime(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) {
@@ -48,6 +97,22 @@ function formatTime(value: string) {
 
 function formatSource(source: WorkspaceFileRevision['source']) {
   return source === 'restore' ? '回滚操作' : '保存更新'
+}
+
+function diffPrefix(type: 'context' | 'removed' | 'added') {
+  if (type === 'removed') {
+    return '-'
+  }
+
+  if (type === 'added') {
+    return '+'
+  }
+
+  return ' '
+}
+
+function selectRevision(revisionId: string) {
+  selectedRevisionId.value = revisionId
 }
 </script>
 
@@ -92,6 +157,8 @@ function formatSource(source: WorkspaceFileRevision['source']) {
             :key="item.id"
             class="revision-item"
             data-testid="revision-item"
+            :class="{ selected: selectedRevisionId === item.id }"
+            @click="selectRevision(item.id)"
           >
             <div class="meta">
               <strong>{{ formatTime(item.createdAt) }}</strong>
@@ -116,6 +183,24 @@ function formatSource(source: WorkspaceFileRevision['source']) {
         >
           暂无版本记录，请先保存文件。
         </p>
+
+        <section v-if="selectedRevision" class="revision-diff" data-testid="revision-diff">
+          <header>
+            <h4>差异预览</h4>
+            <p>
+              {{ selectedRevision.language }} -> {{ currentLanguage }}
+            </p>
+          </header>
+          <pre class="revision-diff-code">
+<code
+  v-for="(row, index) in diffRows"
+  :key="`${index}-${row.type}-${row.oldLine ?? 'n'}-${row.newLine ?? 'n'}`"
+  class="revision-diff-line"
+  :class="row.type"
+  data-testid="revision-diff-line"
+>{{ diffPrefix(row.type) }} {{ row.text }}</code>
+          </pre>
+        </section>
       </section>
     </div>
   </Teleport>
@@ -200,6 +285,11 @@ function formatSource(source: WorkspaceFileRevision['source']) {
   background: var(--theme-surface-neutral-button-background);
 }
 
+.revision-item.selected {
+  border-color: var(--theme-accent-selected-border);
+  background: var(--theme-surface-row-active-background);
+}
+
 .revision-item .meta {
   min-width: 0;
   display: grid;
@@ -242,5 +332,52 @@ function formatSource(source: WorkspaceFileRevision['source']) {
   padding: 20px 16px;
   color: var(--theme-text-tertiary);
   font-size: 13px;
+}
+
+.revision-diff {
+  border-top: 1px solid var(--theme-surface-statusbar-border);
+  padding: 12px 16px 16px;
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+}
+
+.revision-diff h4 {
+  margin: 0;
+  color: var(--theme-text-primary);
+  font-size: 14px;
+}
+
+.revision-diff p {
+  margin: 2px 0 0;
+  color: var(--theme-text-tertiary);
+  font-size: 12px;
+}
+
+.revision-diff-code {
+  margin: 0;
+  max-height: 180px;
+  overflow: auto;
+  border-radius: 10px;
+  border: 1px solid var(--theme-surface-input-border);
+  background: var(--theme-surface-input-background);
+  padding: 8px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.revision-diff-line {
+  display: block;
+  color: var(--theme-text-secondary);
+}
+
+.revision-diff-line.removed {
+  color: var(--theme-text-danger-strong);
+}
+
+.revision-diff-line.added {
+  color: var(--theme-accent-selected-text);
 }
 </style>

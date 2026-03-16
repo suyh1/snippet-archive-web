@@ -33,6 +33,8 @@
 
 ## 2.1 阶段一（2-4 周）：个人效率升级
 
+当前状态：✅ 全面完成（含收口项与性能验收证据）。
+
 ### 目标
 
 让用户从“能管理片段”升级为“能快速找到、复用、追溯片段”。
@@ -236,6 +238,7 @@
 3. 线程 C：revision 后端模型 + API（✅ 已完成）。
 4. 线程 D：revision 前端面板 + 回滚（✅ 已完成）。
 5. 线程 E：前端路由与 store 解耦（✅ 已完成）。
+6. 阶段一收口：Quick Capture + revision diff + 搜索性能验收（✅ 已完成）。
 6. 线程 F：账号与组织基础（未开始）。
 7. 线程 G：权限与分享链接（未开始）。
 8. 线程 H：审计日志与管理页面（未开始）。
@@ -421,6 +424,22 @@ A6 完成标记：
    - `npm run typecheck --workspace @snippet-archive/frontend`
    - `npm run build`
 
+### 2026-03-16｜阶段一收口（完成）
+
+1. 目标：补齐阶段一剩余能力（Quick Capture、revision diff、搜索性能验收证据）并完成闭环。
+2. 结果：
+   - Quick Capture：新增全局按钮与快捷键（Ctrl/Cmd + Shift + K），支持在弹窗中选择工作区/语言/标签并创建片段后跳转到目标上下文。
+   - Revision diff：revision 面板支持选择历史版本并展示与当前草稿的行级差异预览，同时保持回滚链路可用。
+   - 搜索性能：新增可重复基准脚本 `npm run benchmark:search --workspace @snippet-archive/backend`，在 1200 条数据集下实测 `p95=11.50ms`（<500ms）。
+3. 验证命令（均通过）：
+   - `npm run benchmark:search --workspace @snippet-archive/backend`
+   - `npm run test --workspace @snippet-archive/backend`
+   - `npm run test:e2e --workspace @snippet-archive/backend`
+   - `npm run test:run --workspace @snippet-archive/frontend`
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
+   - `npm run typecheck --workspace @snippet-archive/frontend`
+   - `npm run build`
+
 ## 12. 阶段一执行细化（线程 B：标签与收藏）
 
 ### 12.1 线程目标
@@ -580,4 +599,46 @@ E4 完成标记：
 ### 15.3 线程 E 当前状态
 
 1. 当前状态：✅ 已完成（线程 E 全部验收通过）。
+2. 当前阻塞：无。
+
+## 16. 阶段一收口执行细化（Quick Capture + revision diff + 搜索性能验收）
+
+### 16.1 收口目标
+
+1. 补齐 `Quick Capture v1`（全局按钮 + 快捷键 + 新建片段弹窗）。
+2. 补齐 `revision diff` 可视化能力（在版本面板中可查看与当前草稿差异）。
+3. 提供 `1k+` 片段搜索性能证据（响应 `< 500ms`）并固化到执行文档。
+
+### 16.2 小功能点清单（逐项打标）
+
+S0 文档与状态：
+- [x] S0-1：在线程总览新增“阶段一收口”并标记为进行中。
+- [x] S0-2：在本文件追加收口执行记录与最终完成标记。
+
+S1 Quick Capture v1：
+- [x] S1-1：提供全局入口按钮打开“新建片段弹窗”。
+- [x] S1-2：支持快捷键打开弹窗（全局可触达）。
+- [x] S1-3：弹窗支持选择目标工作区、语言、标签并创建文件。
+- [x] S1-4：创建成功后跳转并定位到目标工作区/文件上下文。
+
+S2 Revision diff：
+- [x] S2-1：在 revision 面板展示所选版本与当前草稿差异。
+- [x] S2-2：支持切换版本项时实时更新 diff 结果。
+- [x] S2-3：保持回滚链路与 diff 展示共同可用。
+
+S3 性能验收（搜索）：
+- [x] S3-1：构建 1k+ 片段的可重复基准数据。
+- [x] S3-2：产出搜索接口响应耗时证据并记录 `< 500ms` 结论。
+
+S4 测试与门禁：
+- [x] S4-1：新增/更新前端回归（unit + e2e）并完成 RED->GREEN。
+- [x] S4-2：full gate（backend/frontend test、typecheck、build）通过。
+
+S5 完成标记：
+- [x] S5-1：线程总览将“阶段一收口”标记为已完成。
+- [x] S5-2：追加收口执行记录（命令与结论）。
+
+### 16.3 当前状态
+
+1. 当前状态：✅ 已完成（阶段一收口全部验收通过）。
 2. 当前阻塞：无。

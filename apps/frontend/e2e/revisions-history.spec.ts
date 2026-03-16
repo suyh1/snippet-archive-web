@@ -57,6 +57,10 @@ test('revision panel can restore file to an older saved version', async ({ page,
 
   const revisionRows = page.getByTestId('revision-item')
   await expect(revisionRows).toHaveCount(3)
+  await revisionRows.nth(1).click()
+  await expect(page.getByTestId('revision-diff')).toBeVisible()
+  await expect(page.getByTestId('revision-diff-line').filter({ hasText: '- const version = 2' })).toBeVisible()
+  await expect(page.getByTestId('revision-diff-line').filter({ hasText: '+ const version = 3' })).toBeVisible()
 
   await page.getByTestId('revision-restore').nth(1).click()
   await expect(content).toContainText('const version = 2')
