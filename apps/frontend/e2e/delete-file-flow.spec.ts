@@ -86,18 +86,22 @@ test('delete flow: cancel keeps file, confirm removes file and persists', async 
   // keyboard flow: continuous typing + Enter submit
   await page.getByTestId('create-file-root').click()
   const deleteInput = page.getByTestId('create-inline-input')
-  await deleteInput.type('delete-me.ts')
+  await deleteInput.fill('')
+  await deleteInput.pressSequentially('delete-me.ts')
   await deleteInput.press('Enter')
 
   // click/focus switch/blur flow: blur submit create
   await page.getByTestId('create-file-root').click()
   const keepInput = page.getByTestId('create-inline-input')
-  await keepInput.type('keep.ts')
+  await keepInput.fill('')
+  await keepInput.pressSequentially('keep.ts')
   await page.getByRole('heading', { name: 'Files' }).click()
 
   await page.getByTestId('create-folder-root').click()
-  await page.getByTestId('create-inline-input').type('archive')
-  await page.getByTestId('create-inline-input').press('Enter')
+  const folderInput = page.getByTestId('create-inline-input')
+  await folderInput.fill('')
+  await folderInput.pressSequentially('archive')
+  await folderInput.press('Enter')
 
   const deleteRow = page.getByTestId('tree-row').filter({ hasText: '/delete-me.ts' }).first()
   const keepRow = page.getByTestId('tree-row').filter({ hasText: '/keep.ts' }).first()

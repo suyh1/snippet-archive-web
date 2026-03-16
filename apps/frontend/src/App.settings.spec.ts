@@ -57,6 +57,10 @@ describe('App settings page', () => {
 
     await wrapper.get('[data-testid="settings-tab-themes"]').trigger('click')
     expect(wrapper.find('[data-testid="settings-panel-themes"]').exists()).toBe(true)
+    const themeTutorial = wrapper.get('[data-testid="settings-theme-tutorial"]')
+    expect(themeTutorial.text()).toContain('schemaVersion')
+    expect(themeTutorial.text()).toContain('modules')
+    expect(themeTutorial.text()).toContain('推荐编写步骤')
 
     await wrapper.get('[data-testid="settings-tab-languages"]').trigger('click')
     expect(wrapper.find('[data-testid="settings-panel-languages"]').exists()).toBe(true)

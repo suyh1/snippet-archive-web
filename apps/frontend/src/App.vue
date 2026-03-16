@@ -159,7 +159,61 @@ const activeUiTheme = ref<UiThemeFile>(getActiveUiTheme())
 const builtinThemeOptions = getBuiltinUiThemeCatalog()
 const selectedBuiltinThemeId = ref(builtinThemeOptions[0]?.id ?? 'glass-gradient')
 const themeExportName = ref(normalizeThemeExportFileName(activeUiTheme.value.meta.id))
-const themeTutorialDocPath = 'docs/theme-authoring.md'
+const themeTutorialJsonTemplate = `{
+  "schemaVersion": 1,
+  "meta": {
+    "id": "your-theme-id",
+    "name": "Your Theme Name",
+    "version": "1.0.0",
+    "author": "Your Name",
+    "description": "Theme description"
+  },
+  "modules": {
+    "layout": {},
+    "text": {},
+    "surface": {},
+    "accent": {},
+    "danger": {}
+  }
+}`
+const themeTutorialModules = [
+  {
+    id: 'layout',
+    description: '页面级背景与布局外观（应用背景、侧栏背景等）。',
+    tokenExample: 'layout.appShellBackground',
+  },
+  {
+    id: 'text',
+    description: '文本颜色体系（主文本、次文本、强调、危险文本）。',
+    tokenExample: 'text.primary / text.secondary',
+  },
+  {
+    id: 'surface',
+    description: '面板、卡片、输入框、标签等表面层样式。',
+    tokenExample: 'surface.glassPanelBackground',
+  },
+  {
+    id: 'accent',
+    description: '主操作按钮、选中态、焦点态等品牌强调色。',
+    tokenExample: 'accent.primaryButtonGradient',
+  },
+  {
+    id: 'danger',
+    description: '删除和错误提醒等高风险操作的颜色。',
+    tokenExample: 'danger.strongGradient',
+  },
+]
+const themeTutorialSteps = [
+  '先在本页导出当前主题文件，作为模板起点。',
+  '复制模板后仅修改 meta.id / meta.name，先保证文件可导入。',
+  '优先小步调整 layout 与 accent，便于快速看到全局变化。',
+  '完成后导入 JSON，系统会立刻应用并写入全局主题。',
+]
+const themeTutorialRules = [
+  'schemaVersion 必须是 1。',
+  'meta.id 与 meta.name 必填，modules 下五个分组必须齐全。',
+  '每个 token 值都应为非空字符串，推荐使用 #hex / rgba / gradient。',
+]
 
 const currentThemeMetaText = computed(() => {
   const versionLabel = activeUiTheme.value.meta.version ? ` v${activeUiTheme.value.meta.version}` : ''
@@ -777,7 +831,7 @@ onBeforeUnmount(() => {
 
           <section
             v-else-if="settingsTab === 'themes'"
-            class="settings-tab-panel"
+            class="settings-tab-panel settings-theme-tab-panel"
             data-testid="settings-panel-themes"
           >
             <p>管理全局主题文件。你可以导出当前主题、导入 JSON 主题并实时应用。</p>
@@ -861,10 +915,53 @@ onBeforeUnmount(() => {
                 >
               </div>
 
-              <p class="theme-hint">
-                主题文件遵循模块化结构：`schemaVersion + meta + modules`，编写说明见
-                <code>{{ themeTutorialDocPath }}</code>。
-              </p>
+              <section class="theme-tutorial" data-testid="settings-theme-tutorial">
+                <h5>主题编写教程</h5>
+                <p>主题文件采用模块化结构：`schemaVersion + meta + modules`。</p>
+
+                <div class="theme-tutorial-section">
+                  <h6>文件结构模板</h6>
+                  <pre class="theme-tutorial-code"><code>{{ themeTutorialJsonTemplate }}</code></pre>
+                </div>
+
+                <div class="theme-tutorial-section">
+                  <h6>模块职责</h6>
+                  <ul class="theme-tutorial-list">
+                    <li
+                      v-for="item in themeTutorialModules"
+                      :key="item.id"
+                    >
+                      <strong>{{ item.id }}</strong>
+                      <span>{{ item.description }}</span>
+                      <code>{{ item.tokenExample }}</code>
+                    </li>
+                  </ul>
+                </div>
+
+                <div class="theme-tutorial-section">
+                  <h6>推荐编写步骤</h6>
+                  <ol class="theme-tutorial-steps">
+                    <li
+                      v-for="step in themeTutorialSteps"
+                      :key="step"
+                    >
+                      {{ step }}
+                    </li>
+                  </ol>
+                </div>
+
+                <div class="theme-tutorial-section">
+                  <h6>编写约束</h6>
+                  <ul class="theme-tutorial-list">
+                    <li
+                      v-for="rule in themeTutorialRules"
+                      :key="rule"
+                    >
+                      {{ rule }}
+                    </li>
+                  </ul>
+                </div>
+              </section>
 
               <p
                 v-if="themeFeedbackMessage"
@@ -1298,6 +1395,10 @@ h2 {
   gap: 10px;
 }
 
+.settings-theme-tab-panel {
+  overflow: hidden;
+}
+
 .settings-tab-panel p {
   margin: 0;
   color: var(--theme-text-secondary);
@@ -1305,8 +1406,10 @@ h2 {
 }
 
 .theme-settings {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
+  min-height: 0;
   border: 1px solid var(--theme-surface-glass-panel-border);
   border-radius: 12px;
   padding: 10px;
@@ -1420,16 +1523,92 @@ h2 {
   pointer-events: none;
 }
 
-.theme-hint {
+.theme-tutorial {
+  border: 1px solid var(--theme-surface-input-border);
+  border-radius: 10px;
+  background: var(--theme-surface-glass-card-background);
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  flex: 1 1 auto;
+}
+
+.theme-tutorial h5,
+.theme-tutorial h6 {
+  margin: 0;
+  color: var(--theme-text-primary);
+}
+
+.theme-tutorial h5 {
+  font-size: 13px;
+}
+
+.theme-tutorial h6 {
+  font-size: 12px;
+}
+
+.theme-tutorial p {
+  margin: 0;
   color: var(--theme-text-secondary);
   font-size: 12px;
 }
 
-.theme-hint code {
+.theme-tutorial-section {
+  display: grid;
+  gap: 6px;
+}
+
+.theme-tutorial-code {
+  margin: 0;
+  border-radius: 8px;
+  border: 1px solid var(--theme-surface-input-border);
+  background: var(--theme-surface-code-tag-background);
+  padding: 8px;
+  overflow: auto;
+}
+
+.theme-tutorial-code code {
+  display: block;
+  color: var(--theme-text-primary);
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre;
+}
+
+.theme-tutorial-list,
+.theme-tutorial-steps {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.theme-tutorial-list li,
+.theme-tutorial-steps li {
+  color: var(--theme-text-secondary);
+  font-size: 12px;
+}
+
+.theme-tutorial-list li {
+  display: grid;
+  gap: 2px;
+}
+
+.theme-tutorial-list li strong {
+  color: var(--theme-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.theme-tutorial-list li code {
   background: var(--theme-surface-code-tag-background);
   color: var(--theme-text-primary);
   border-radius: 6px;
   padding: 2px 5px;
+  width: fit-content;
+  font-size: 11px;
 }
 
 .theme-feedback {

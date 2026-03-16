@@ -1,6 +1,49 @@
 import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 
+async function readSettingsLayoutMetrics(page: Parameters<typeof test>[0]['page']) {
+  return page.evaluate(() => {
+    const shell = document.querySelector('.app-shell') as HTMLElement | null
+    const content = document.querySelector('.content') as HTMLElement | null
+    const settingsView = document.querySelector('.settings-view') as HTMLElement | null
+    const settingsPanel = document.querySelector('.settings-panel') as HTMLElement | null
+    const activeTabPanel = document.querySelector(
+      '[data-testid^="settings-panel-"]',
+    ) as HTMLElement | null
+    const themeSettings = document.querySelector('[data-testid="settings-theme-panel"]') as
+      | HTMLElement
+      | null
+    const tutorial = document.querySelector('[data-testid="settings-theme-tutorial"]') as
+      | HTMLElement
+      | null
+
+    const contentRect = content?.getBoundingClientRect()
+    const contentStyle = content ? window.getComputedStyle(content) : null
+    const contentPaddingBottom = contentStyle ? parseFloat(contentStyle.paddingBottom) : 0
+    const contentInnerBottom = contentRect ? contentRect.bottom - contentPaddingBottom : 0
+
+    const panelRect = settingsPanel?.getBoundingClientRect()
+    const panelStyle = settingsPanel ? window.getComputedStyle(settingsPanel) : null
+    const panelBottomInset = panelStyle
+      ? parseFloat(panelStyle.borderBottomWidth) + parseFloat(panelStyle.paddingBottom)
+      : 0
+    const panelContentBottom = panelRect ? panelRect.bottom - panelBottomInset : 0
+
+    return {
+      shellHeight: shell?.getBoundingClientRect().height ?? 0,
+      viewportHeight: window.innerHeight,
+      docHeight: document.documentElement.scrollHeight,
+      bodyHeight: document.body.scrollHeight,
+      contentInnerBottom,
+      settingsViewBottom: settingsView?.getBoundingClientRect().bottom ?? 0,
+      activeTabPanelBottom: activeTabPanel?.getBoundingClientRect().bottom ?? 0,
+      panelContentBottom,
+      themeSettingsBottom: themeSettings?.getBoundingClientRect().bottom ?? 0,
+      tutorialBottom: tutorial?.getBoundingClientRect().bottom ?? 0,
+    }
+  })
+}
+
 test('settings page shows language list and supports tab switching', async ({ page }) => {
   await page.goto('/')
 
@@ -16,6 +59,10 @@ test('settings page shows language list and supports tab switching', async ({ pa
 
   await page.getByTestId('settings-tab-themes').click()
   await expect(page.getByTestId('settings-panel-themes')).toBeVisible()
+  const themeTutorial = page.getByTestId('settings-theme-tutorial')
+  await expect(themeTutorial).toBeVisible()
+  await expect(themeTutorial).toContainText('schemaVersion')
+  await expect(themeTutorial).toContainText('modules')
 
   await page.getByTestId('settings-tab-languages').click()
   await expect(page.getByTestId('settings-panel-languages')).toBeVisible()
@@ -32,6 +79,52 @@ test('settings page shows language list and supports tab switching', async ({ pa
 
   await page.getByTestId('back-to-workspace').click()
   await expect(page.getByTestId('open-settings')).toBeVisible()
+})
+
+test('settings themes tutorial stays contained and is scrollable', async ({ page }) => {
+  await page.goto('/')
+  await page.getByTestId('open-settings').click()
+
+  await page.getByTestId('settings-tab-general').click()
+  await expect(page.getByTestId('settings-panel-general')).toBeVisible()
+  const sparseStateLayout = await readSettingsLayoutMetrics(page)
+  expect(Math.abs(sparseStateLayout.shellHeight - sparseStateLayout.viewportHeight)).toBeLessThanOrEqual(4)
+  expect(sparseStateLayout.docHeight).toBeLessThanOrEqual(sparseStateLayout.viewportHeight + 4)
+  expect(sparseStateLayout.bodyHeight).toBeLessThanOrEqual(sparseStateLayout.viewportHeight + 4)
+  expect(
+    Math.abs(sparseStateLayout.settingsViewBottom - sparseStateLayout.contentInnerBottom),
+  ).toBeLessThanOrEqual(2)
+  expect(
+    Math.abs(sparseStateLayout.activeTabPanelBottom - sparseStateLayout.panelContentBottom),
+  ).toBeLessThanOrEqual(2)
+
+  await page.getByTestId('settings-tab-themes').click()
+  await expect(page.getByTestId('settings-panel-themes')).toBeVisible()
+
+  const denseStateLayout = await readSettingsLayoutMetrics(page)
+  expect(Math.abs(denseStateLayout.shellHeight - denseStateLayout.viewportHeight)).toBeLessThanOrEqual(4)
+  expect(denseStateLayout.docHeight).toBeLessThanOrEqual(denseStateLayout.viewportHeight + 4)
+  expect(denseStateLayout.bodyHeight).toBeLessThanOrEqual(denseStateLayout.viewportHeight + 4)
+  expect(Math.abs(denseStateLayout.settingsViewBottom - denseStateLayout.contentInnerBottom)).toBeLessThanOrEqual(2)
+  expect(Math.abs(denseStateLayout.activeTabPanelBottom - denseStateLayout.panelContentBottom)).toBeLessThanOrEqual(2)
+  expect(denseStateLayout.themeSettingsBottom).toBeLessThanOrEqual(denseStateLayout.panelContentBottom + 2)
+  expect(denseStateLayout.tutorialBottom).toBeLessThanOrEqual(denseStateLayout.panelContentBottom + 2)
+
+  const tutorialScroll = await page.getByTestId('settings-theme-tutorial').evaluate((node) => {
+    const element = node as HTMLElement
+    element.scrollTop = 0
+    element.scrollTop = 120
+    return {
+      overflowY: window.getComputedStyle(element).overflowY,
+      scrollTop: element.scrollTop,
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+    }
+  })
+
+  expect(['auto', 'scroll']).toContain(tutorialScroll.overflowY)
+  expect(tutorialScroll.scrollHeight).toBeGreaterThan(tutorialScroll.clientHeight)
+  expect(tutorialScroll.scrollTop).toBeGreaterThan(0)
 })
 
 test('settings themes tab supports import/export and keyboard flows', async ({ page }) => {
