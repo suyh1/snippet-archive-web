@@ -116,7 +116,7 @@ const statusLanguageLabel = computed(() => {
   return getLanguageLabel(language)
 })
 type AppView = 'workspace' | 'settings'
-type SettingsTab = 'general' | 'languages'
+type SettingsTab = 'general' | 'themes' | 'languages'
 const currentView = ref<AppView>('workspace')
 const settingsTab = ref<SettingsTab>('languages')
 const languageSearchQuery = ref('')
@@ -178,17 +178,28 @@ function syncBuiltinThemeSelection() {
   selectedBuiltinThemeId.value = activeUiTheme.value.meta.id
 }
 
-function applySelectedBuiltinTheme() {
-  const result = applyBuiltinUiTheme(selectedBuiltinThemeId.value)
+function applyBuiltinThemeById(themeId: string) {
+  const result = applyBuiltinUiTheme(themeId)
   if (!result.ok) {
     themeFeedbackMessage.value = `切换失败：${result.error}`
+    syncBuiltinThemeSelection()
     return
   }
 
+  selectedBuiltinThemeId.value = result.theme.meta.id
   activeUiTheme.value = result.theme
-  syncBuiltinThemeSelection()
   syncThemeExportName()
   themeFeedbackMessage.value = `已切换系统主题：${result.theme.meta.name}`
+}
+
+function handleBuiltinThemeChange(event: Event) {
+  const target = event.target as HTMLSelectElement | null
+  if (!target) {
+    return
+  }
+
+  selectedBuiltinThemeId.value = target.value
+  applyBuiltinThemeById(target.value)
 }
 
 function handleThemeExportNameBlur() {
@@ -739,6 +750,15 @@ onBeforeUnmount(() => {
             <button
               type="button"
               class="settings-tab-button"
+              data-testid="settings-tab-themes"
+              :aria-selected="settingsTab === 'themes'"
+              @click="switchSettingsTab('themes')"
+            >
+              主题
+            </button>
+            <button
+              type="button"
+              class="settings-tab-button"
               data-testid="settings-tab-languages"
               :aria-selected="settingsTab === 'languages'"
               @click="switchSettingsTab('languages')"
@@ -751,6 +771,14 @@ onBeforeUnmount(() => {
             v-if="settingsTab === 'general'"
             class="settings-tab-panel"
             data-testid="settings-panel-general"
+          >
+            <p>更多基础设置项会在后续版本补充。</p>
+          </section>
+
+          <section
+            v-else-if="settingsTab === 'themes'"
+            class="settings-tab-panel"
+            data-testid="settings-panel-themes"
           >
             <p>管理全局主题文件。你可以导出当前主题、导入 JSON 主题并实时应用。</p>
 
@@ -771,8 +799,9 @@ onBeforeUnmount(() => {
                 <span>系统预置主题（9 套）</span>
                 <div class="theme-preset-actions">
                   <select
-                    v-model="selectedBuiltinThemeId"
+                    :value="selectedBuiltinThemeId"
                     data-testid="settings-theme-preset-select"
+                    @change="handleBuiltinThemeChange"
                   >
                     <option
                       v-for="theme in builtinThemeOptions"
@@ -782,14 +811,6 @@ onBeforeUnmount(() => {
                       {{ theme.name }}
                     </option>
                   </select>
-                  <button
-                    type="button"
-                    class="theme-action"
-                    data-testid="settings-theme-apply-preset"
-                    @click="applySelectedBuiltinTheme"
-                  >
-                    一键切换
-                  </button>
                 </div>
               </label>
 
@@ -1338,7 +1359,7 @@ h2 {
 
 .theme-preset-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
 }
 

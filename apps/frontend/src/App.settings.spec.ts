@@ -55,6 +55,9 @@ describe('App settings page', () => {
     await wrapper.get('[data-testid="settings-tab-general"]').trigger('click')
     expect(wrapper.find('[data-testid="settings-panel-general"]').exists()).toBe(true)
 
+    await wrapper.get('[data-testid="settings-tab-themes"]').trigger('click')
+    expect(wrapper.find('[data-testid="settings-panel-themes"]').exists()).toBe(true)
+
     await wrapper.get('[data-testid="settings-tab-languages"]').trigger('click')
     expect(wrapper.find('[data-testid="settings-panel-languages"]').exists()).toBe(true)
 
@@ -62,7 +65,7 @@ describe('App settings page', () => {
     expect(wrapper.find('[data-testid="settings-view"]').exists()).toBe(false)
   })
 
-  it('imports and exports theme files in general tab', async () => {
+  it('imports and exports theme files in themes tab', async () => {
     const createObjectUrlSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:theme-export')
     const revokeObjectUrlSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
     const anchorClickSpy = vi
@@ -79,7 +82,7 @@ describe('App settings page', () => {
     })
 
     await wrapper.get('[data-testid="open-settings"]').trigger('click')
-    await wrapper.get('[data-testid="settings-tab-general"]').trigger('click')
+    await wrapper.get('[data-testid="settings-tab-themes"]').trigger('click')
     await vi.waitFor(() => {
       expect(wrapper.find('[data-testid="settings-theme-panel"]').exists()).toBe(true)
     })
@@ -87,7 +90,6 @@ describe('App settings page', () => {
     const presetSelect = wrapper.get('[data-testid="settings-theme-preset-select"]')
     expect((presetSelect.element as HTMLSelectElement).options.length).toBeGreaterThanOrEqual(9)
     await presetSelect.setValue('graphite-pro')
-    await wrapper.get('[data-testid="settings-theme-apply-preset"]').trigger('click')
     expect(wrapper.get('[data-testid="settings-theme-current-id"]').text()).toBe('graphite-pro')
 
     const fileNameInput = wrapper.get('[data-testid="settings-theme-export-name"]')

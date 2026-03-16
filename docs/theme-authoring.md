@@ -57,6 +57,8 @@
 8. `mono-minimal`
 9. `aurora-night`
 
+在设置页「主题」Tab 中，选择预置主题后会立即全局生效，不需要额外确认按钮。
+
 ## 4. 常见 token 示例
 
 ```json

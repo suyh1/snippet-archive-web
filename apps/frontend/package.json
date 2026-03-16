@@ -7,6 +7,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
+    "check:theme-contract": "node ./scripts/check-theme-token-contract.mjs",
+    "check:no-hardcoded-colors": "node ./scripts/check-no-hardcoded-colors.mjs",
+    "check:theme-guards": "npm run check:theme-contract && npm run check:no-hardcoded-colors",
     "test": "vitest",
     "test:run": "vitest run",
     "test:e2e:smoke": "playwright test --config ./playwright.config.ts"

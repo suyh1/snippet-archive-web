@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 
-test('settings page shows supported languages tab and list', async ({ page }) => {
+test('settings page shows language list and supports tab switching', async ({ page }) => {
   await page.goto('/')
 
   await page.getByTestId('open-settings').click()
@@ -13,6 +13,9 @@ test('settings page shows supported languages tab and list', async ({ page }) =>
 
   await page.getByTestId('settings-tab-general').click()
   await expect(page.getByTestId('settings-panel-general')).toBeVisible()
+
+  await page.getByTestId('settings-tab-themes').click()
+  await expect(page.getByTestId('settings-panel-themes')).toBeVisible()
 
   await page.getByTestId('settings-tab-languages').click()
   await expect(page.getByTestId('settings-panel-languages')).toBeVisible()
@@ -31,22 +34,20 @@ test('settings page shows supported languages tab and list', async ({ page }) =>
   await expect(page.getByTestId('open-settings')).toBeVisible()
 })
 
-test('settings general tab supports theme import/export and keyboard flows', async ({ page }) => {
+test('settings themes tab supports import/export and keyboard flows', async ({ page }) => {
   await page.goto('/')
   await page.getByTestId('open-settings').click()
-  await page.getByTestId('settings-tab-general').click()
+  await page.getByTestId('settings-tab-themes').click()
 
   await expect(page.getByTestId('settings-theme-panel')).toBeVisible()
   await expect(page.getByTestId('settings-theme-current-id')).toContainText('glass-gradient')
 
   await expect(page.getByTestId('settings-theme-preset-select')).toBeVisible()
   await page.getByTestId('settings-theme-preset-select').selectOption('graphite-pro')
-  await page.getByTestId('settings-theme-apply-preset').click()
   await expect(page.getByTestId('settings-theme-current-id')).toContainText('graphite-pro')
 
-  await page.getByTestId('settings-theme-preset-select').selectOption('nordic-fog')
-  await page.getByTestId('settings-theme-apply-preset').focus()
-  await page.keyboard.press('Enter')
+  const presetSelect = page.getByTestId('settings-theme-preset-select')
+  await presetSelect.selectOption('nordic-fog')
   await expect(page.getByTestId('settings-theme-current-id')).toContainText('nordic-fog')
 
   const exportNameInput = page.getByTestId('settings-theme-export-name')
@@ -100,7 +101,7 @@ test('settings general tab supports theme import/export and keyboard flows', asy
 
   await page.reload()
   await page.getByTestId('open-settings').click()
-  await page.getByTestId('settings-tab-general').click()
+  await page.getByTestId('settings-tab-themes').click()
   await expect(page.getByTestId('settings-theme-current-id')).toContainText('rose-glass')
 
   const resetButton = page.getByTestId('settings-theme-reset')
@@ -108,4 +109,50 @@ test('settings general tab supports theme import/export and keyboard flows', asy
   await page.keyboard.press('Enter')
 
   await expect(page.getByTestId('settings-theme-current-id')).toContainText('glass-gradient')
+})
+
+test('themes tab can cycle all built-in presets and apply immediately', async ({ page }) => {
+  await page.goto('/')
+  await page.getByTestId('open-settings').click()
+  await page.getByTestId('settings-tab-themes').click()
+
+  const presetIds = [
+    'glass-gradient',
+    'nordic-fog',
+    'graphite-pro',
+    'tokyo-neon',
+    'paper-ink',
+    'forest-glass',
+    'sunset-ui',
+    'mono-minimal',
+    'aurora-night',
+  ]
+
+  let previousShellBackground = ''
+  for (const presetId of presetIds) {
+    await page.getByTestId('settings-theme-preset-select').selectOption(presetId)
+    await expect(page.getByTestId('settings-theme-current-id')).toContainText(presetId)
+
+    const appliedState = await page.evaluate(() => {
+      const shell = document.querySelector('.app-shell')
+      const shellBackground = shell ? getComputedStyle(shell).backgroundImage : ''
+      return {
+        themeId: document.documentElement.dataset.uiThemeId ?? '',
+        shellBackground,
+      }
+    })
+
+    expect(appliedState.themeId).toBe(presetId)
+    expect(appliedState.shellBackground).not.toBe('')
+
+    if (previousShellBackground) {
+      expect(appliedState.shellBackground).not.toBe(previousShellBackground)
+    }
+    previousShellBackground = appliedState.shellBackground
+  }
+
+  await page.reload()
+  await page.getByTestId('open-settings').click()
+  await page.getByTestId('settings-tab-themes').click()
+  await expect(page.getByTestId('settings-theme-current-id')).toContainText('aurora-night')
 })
