@@ -48,6 +48,7 @@ test('settings page shows language list and supports tab switching', async ({ pa
   await page.goto('/')
 
   await page.getByTestId('open-settings').click()
+  await expect(page).toHaveURL(/\/settings(?:\?.*)?$/)
   await expect(page.getByTestId('settings-view')).toBeVisible()
 
   await expect(page.getByTestId('settings-panel-languages')).toBeVisible()
@@ -78,6 +79,7 @@ test('settings page shows language list and supports tab switching', async ({ pa
   expect(onlyItemBox!.height).toBeLessThan(140)
 
   await page.getByTestId('back-to-workspace').click()
+  await expect(page).toHaveURL(/\/workspace(?:\?.*)?$/)
   await expect(page.getByTestId('open-settings')).toBeVisible()
 })
 
@@ -193,7 +195,7 @@ test('settings themes tab supports import/export and keyboard flows', async ({ p
   expect(importedShellBackground).toContain('#fda4af')
 
   await page.reload()
-  await page.getByTestId('open-settings').click()
+  await expect(page).toHaveURL(/\/settings(?:\?.*)?$/)
   await page.getByTestId('settings-tab-themes').click()
   await expect(page.getByTestId('settings-theme-current-id')).toContainText('rose-glass')
 
@@ -245,7 +247,7 @@ test('themes tab can cycle all built-in presets and apply immediately', async ({
   }
 
   await page.reload()
-  await page.getByTestId('open-settings').click()
+  await expect(page).toHaveURL(/\/settings(?:\?.*)?$/)
   await page.getByTestId('settings-tab-themes').click()
   await expect(page.getByTestId('settings-theme-current-id')).toContainText('aurora-night')
 })

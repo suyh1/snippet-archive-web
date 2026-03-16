@@ -19,10 +19,10 @@ vi.mock('@/api/workspaces', () => {
   }
 })
 
-import App from './App.vue'
+import SettingsPage from '@/pages/SettingsPage.vue'
 import { workspaceApi } from '@/api/workspaces'
 
-describe('App settings page', () => {
+describe('Settings page', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     window.location.hash = '#/'
@@ -30,17 +30,15 @@ describe('App settings page', () => {
     vi.mocked(workspaceApi.list).mockResolvedValue([])
   })
 
-  it('opens settings page and shows supported languages tab', async () => {
+  it('shows supported languages tab and can switch tabs', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
 
-    const wrapper = mount(App, {
+    const wrapper = mount(SettingsPage, {
       global: {
         plugins: [pinia],
       },
     })
-
-    await wrapper.get('[data-testid="open-settings"]').trigger('click')
 
     await vi.waitFor(() => {
       expect(wrapper.find('[data-testid="settings-view"]').exists()).toBe(true)
@@ -64,9 +62,6 @@ describe('App settings page', () => {
 
     await wrapper.get('[data-testid="settings-tab-languages"]').trigger('click')
     expect(wrapper.find('[data-testid="settings-panel-languages"]').exists()).toBe(true)
-
-    await wrapper.get('[data-testid="back-to-workspace"]').trigger('click')
-    expect(wrapper.find('[data-testid="settings-view"]').exists()).toBe(false)
   })
 
   it('imports and exports theme files in themes tab', async () => {
@@ -79,13 +74,12 @@ describe('App settings page', () => {
     const pinia = createPinia()
     setActivePinia(pinia)
 
-    const wrapper = mount(App, {
+    const wrapper = mount(SettingsPage, {
       global: {
         plugins: [pinia],
       },
     })
 
-    await wrapper.get('[data-testid="open-settings"]').trigger('click')
     await wrapper.get('[data-testid="settings-tab-themes"]').trigger('click')
     await vi.waitFor(() => {
       expect(wrapper.find('[data-testid="settings-theme-panel"]').exists()).toBe(true)

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import CodeEditor, {
   type CodeEditorTheme,
@@ -39,6 +39,10 @@ import {
 import { normalizeThemeExportFileName, type UiThemeFile } from '@/themes/theme-schema'
 
 const workspaceStore = useWorkspaceStore()
+const appInstance = getCurrentInstance()
+const router = appInstance?.appContext.config.globalProperties.$router as
+  | { push: (path: string) => unknown }
+  | undefined
 
 const {
   workspaces,
@@ -129,9 +133,11 @@ type SettingsTab = 'general' | 'themes' | 'languages'
 const props = withDefaults(
   defineProps<{
     initialView?: AppView
+    mode?: AppView
   }>(),
   {
     initialView: 'workspace',
+    mode: 'workspace',
   },
 )
 const currentView = ref<AppView>(props.initialView)
@@ -357,6 +363,12 @@ onMounted(async () => {
     editorTheme.value = storedTheme
   }
 
+  if (props.mode === 'settings') {
+    syncWorkspaceTagsInput()
+    syncFileTagsInput()
+    return
+  }
+
   await workspaceStore.loadWorkspaces()
 
   const params = new URLSearchParams(window.location.search)
@@ -379,26 +391,28 @@ watch(editorTheme, (theme) => {
   window.localStorage.setItem('editor-theme', theme)
 })
 
-function updateHashForView(view: AppView) {
-  const targetHash = view === 'settings' ? '#/settings' : '#/'
-  if (window.location.hash === targetHash) {
+function openSettings() {
+  if (props.mode === 'settings') {
     return
   }
 
-  window.location.hash = targetHash
-}
-
-function openSettings() {
   void runWithUnsavedGuard(() => {
-    currentView.value = 'settings'
-    settingsTab.value = 'languages'
-    updateHashForView('settings')
+    if (router) {
+      void router.push('/settings')
+      return
+    }
+
+    window.location.assign('/settings')
   })
 }
 
 function backToWorkspaceView() {
-  currentView.value = 'workspace'
-  updateHashForView('workspace')
+  if (router) {
+    void router.push('/workspace')
+    return
+  }
+
+  window.location.assign('/workspace')
 }
 
 function switchSettingsTab(tab: SettingsTab) {

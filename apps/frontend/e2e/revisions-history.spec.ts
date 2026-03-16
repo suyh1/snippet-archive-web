@@ -12,6 +12,16 @@ async function cleanupWorkspaces(request: APIRequestContext) {
   }
 }
 
+async function saveCurrentDraft(
+  page: Parameters<typeof test>[0]['page'],
+) {
+  const saveButton = page.getByRole('button', { name: /保存|已保存/ })
+  await expect(saveButton).toBeVisible()
+  await expect(saveButton).toBeEnabled()
+  await saveButton.click()
+  await expect(page.getByRole('button', { name: '已保存' })).toBeVisible()
+}
+
 test('revision panel can restore file to an older saved version', async ({ page, request }) => {
   await cleanupWorkspaces(request)
 
@@ -30,17 +40,17 @@ test('revision panel can restore file to an older saved version', async ({ page,
   await content.click()
   await page.keyboard.press('ControlOrMeta+a')
   await page.keyboard.type('const version = 1')
-  await page.getByRole('button', { name: '保存' }).click()
+  await saveCurrentDraft(page)
 
   await content.click()
   await page.keyboard.press('ControlOrMeta+a')
   await page.keyboard.type('const version = 2')
-  await page.getByRole('button', { name: '保存' }).click()
+  await saveCurrentDraft(page)
 
   await content.click()
   await page.keyboard.press('ControlOrMeta+a')
   await page.keyboard.type('const version = 3')
-  await page.getByRole('button', { name: '保存' }).click()
+  await saveCurrentDraft(page)
 
   await page.getByTestId('editor-revisions').click()
   await expect(page.getByTestId('revision-dialog')).toBeVisible()

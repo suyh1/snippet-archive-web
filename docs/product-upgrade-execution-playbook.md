@@ -235,7 +235,7 @@
 2. 线程 B：标签与收藏（✅ 已完成）。
 3. 线程 C：revision 后端模型 + API（✅ 已完成）。
 4. 线程 D：revision 前端面板 + 回滚（✅ 已完成）。
-5. 线程 E：前端路由与 store 解耦（未开始）。
+5. 线程 E：前端路由与 store 解耦（✅ 已完成）。
 6. 线程 F：账号与组织基础（未开始）。
 7. 线程 G：权限与分享链接（未开始）。
 8. 线程 H：审计日志与管理页面（未开始）。
@@ -406,6 +406,21 @@ A6 完成标记：
    - `npm run typecheck --workspace @snippet-archive/frontend`
    - `npm run build`
 
+### 2026-03-16｜线程 E（完成）
+
+1. 目标：完成“前端路由与 store 解耦”并通过门禁。
+2. 结果：
+   - 设置页解耦：`/settings` 路由不再触发工作区数据加载，避免对 `workspaceStore` 的非必要依赖。
+   - 路由收敛：工作台“设置”与设置页“返回工作台”统一走真实路由跳转（`/settings` 与 `/workspace`），不再依赖 hash 视图切换。
+   - 回归增强：新增 `SettingsPage` 解耦单测；更新设置页 e2e 覆盖路由断言与 reload 场景；修复 revision e2e 保存节奏稳定性。
+3. 验证命令（均通过）：
+   - `npm run test --workspace @snippet-archive/backend`
+   - `npm run test:e2e --workspace @snippet-archive/backend`
+   - `npm run test:run --workspace @snippet-archive/frontend`
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
+   - `npm run typecheck --workspace @snippet-archive/frontend`
+   - `npm run build`
+
 ## 12. 阶段一执行细化（线程 B：标签与收藏）
 
 ### 12.1 线程目标
@@ -528,4 +543,41 @@ D5 完成标记：
 ### 14.3 线程 D 当前状态
 
 1. 当前状态：✅ 已完成（线程 D 全部验收通过）。
+2. 当前阻塞：无。
+
+## 15. 阶段一执行细化（线程 E：前端路由与 store 解耦）
+
+### 15.1 线程目标
+
+1. 将设置页从工作台数据流中解耦，避免进入设置路由时触发工作区加载。
+2. 统一设置入口为真实路由跳转，消除 hash 视图切换耦合。
+3. 通过回归测试覆盖“解耦 + 路由跳转 + reload”关键链路。
+
+### 15.2 线程 E 小功能点清单（逐项打标）
+
+E0 文档与状态：
+- [x] E0-1：在线程总览中将线程 E 状态标记为“进行中/已完成”。
+- [x] E0-2：在本文件追加线程 E 细化清单与执行记录。
+
+E1 路由与页面解耦：
+- [x] E1-1：`/settings` 页面不再触发 `workspaceApi.list`。
+- [x] E1-2：工作台“设置”入口改为 `/settings` 路由跳转。
+- [x] E1-3：设置页“返回工作台”改为 `/workspace` 路由跳转。
+
+E2 回归测试：
+- [x] E2-1：新增设置页解耦单测（先红后绿）。
+- [x] E2-2：更新设置页 e2e 路由断言与 reload 场景（先红后绿）。
+- [x] E2-3：修复 revision e2e 稳定性回归（保存节奏同步）。
+
+E3 验证门禁：
+- [x] E3-1：targeted 回归（新增 unit + e2e）通过。
+- [x] E3-2：full gate（backend/frontend test、typecheck、build）通过。
+
+E4 完成标记：
+- [x] E4-1：线程清单将“线程 E”标记为已完成。
+- [x] E4-2：追加线程 E 完成执行记录与命令证据。
+
+### 15.3 线程 E 当前状态
+
+1. 当前状态：✅ 已完成（线程 E 全部验收通过）。
 2. 当前阻塞：无。

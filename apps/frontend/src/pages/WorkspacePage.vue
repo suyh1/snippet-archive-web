@@ -3,5 +3,5 @@ import AppWorkbench from '@/App.vue'
 </script>
 
 <template>
-  <AppWorkbench initial-view="workspace" />
+  <AppWorkbench initial-view="workspace" mode="workspace" />
 </template>
