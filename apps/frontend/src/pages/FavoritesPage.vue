@@ -80,6 +80,10 @@ function openFavorite(item: FavoriteItem) {
   })
 }
 
+function goToWorkspace() {
+  void router.push('/workspace')
+}
+
 function goToPage(nextPage: number) {
   page.value = Math.max(1, nextPage)
   void loadFavorites()
@@ -100,7 +104,7 @@ onMounted(() => {
       <p class="meta">{{ total }} 条收藏</p>
     </header>
 
-    <section class="favorites-filters">
+    <section class="favorites-filters" data-testid="favorites-filters">
       <label>
         类型
         <select v-model="typeFilter" data-testid="favorites-type-select" @change="loadFavorites({ resetPage: true })">
@@ -144,23 +148,36 @@ onMounted(() => {
 
     <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
 
-    <section v-if="items.length > 0" class="favorites-list" data-testid="favorites-list">
-      <article v-for="item in items" :key="`${item.type}-${item.id}`" class="favorites-item" data-testid="favorites-item">
-        <div class="favorites-item-main">
-          <strong>{{ item.title }}</strong>
-          <span>{{ item.workspaceTitle }}</span>
-          <code v-if="item.path">{{ item.path }}</code>
-          <span class="tag-row">{{ item.tags.join(', ') || '无标签' }}</span>
-        </div>
-        <button data-testid="favorites-open" type="button" @click="openFavorite(item)">打开</button>
-      </article>
+    <section class="favorites-content" data-testid="favorites-content">
+      <section v-if="items.length > 0" class="favorites-list" data-testid="favorites-list">
+        <article v-for="item in items" :key="`${item.type}-${item.id}`" class="favorites-item" data-testid="favorites-item">
+          <div class="favorites-item-main">
+            <strong>{{ item.title }}</strong>
+            <span>{{ item.workspaceTitle }}</span>
+            <code v-if="item.path">{{ item.path }}</code>
+            <span class="tag-row">{{ item.tags.join(', ') || '无标签' }}</span>
+          </div>
+          <button data-testid="favorites-open" type="button" @click="openFavorite(item)">打开</button>
+        </article>
+      </section>
+
+      <section v-else class="favorites-empty-panel" data-testid="favorites-empty-panel">
+        <p class="empty-note" data-testid="favorites-empty">
+          {{ loading ? '正在加载收藏...' : '还没有收藏项，先在工作区或文件上点击收藏。' }}
+        </p>
+        <button
+          v-if="!loading"
+          type="button"
+          class="favorites-empty-action"
+          data-testid="favorites-empty-go-workspace"
+          @click="goToWorkspace"
+        >
+          去工作区添加收藏
+        </button>
+      </section>
     </section>
 
-    <p v-else class="empty-note" data-testid="favorites-empty">
-      {{ loading ? '正在加载收藏...' : '还没有收藏项，先在工作区或文件上点击收藏。' }}
-    </p>
-
-    <footer class="favorites-pagination">
+    <footer v-if="items.length > 0" class="favorites-pagination" data-testid="favorites-pagination">
       <button data-testid="favorites-prev" type="button" :disabled="page <= 1 || loading" @click="goToPage(page - 1)">上一页</button>
       <span data-testid="favorites-page-indicator">第 {{ page }} / {{ totalPages }} 页</span>
       <button data-testid="favorites-next" type="button" :disabled="page >= totalPages || loading" @click="goToPage(page + 1)">下一页</button>
@@ -171,22 +188,37 @@ onMounted(() => {
 <style scoped>
 .favorites-page {
   display: grid;
-  gap: 14px;
-  padding: 20px;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  align-content: start;
+  gap: 12px;
+  padding: 18px 16px 16px;
   min-height: 100%;
+  width: min(1280px, 100%);
+  margin: 0 auto;
 }
 
 .favorites-header {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
+  gap: 12px;
+  border: 1px solid var(--theme-surface-row-border);
+  border-radius: 14px;
+  background: var(--theme-surface-glass-card-background);
+  backdrop-filter: var(--theme-surface-overlay-blur);
+  padding: 12px 14px;
 }
 
 .favorites-filters {
-  display: flex;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 210px)) minmax(0, 1fr);
+  gap: 10px 12px;
   align-items: end;
-  flex-wrap: wrap;
+  border: 1px solid var(--theme-surface-row-border);
+  border-radius: 12px;
+  background: var(--theme-surface-glass-card-background);
+  backdrop-filter: var(--theme-surface-overlay-blur);
+  padding: 10px 12px;
 }
 
 .favorites-filters label {
@@ -199,12 +231,17 @@ onMounted(() => {
 
 .favorites-filters input,
 .favorites-filters select {
+  width: 100%;
   border: 1px solid var(--theme-surface-input-border);
   background: var(--theme-surface-input-background);
   color: var(--theme-text-primary);
   border-radius: 8px;
-  padding: 5px 8px;
+  padding: 0 8px;
   min-height: 34px;
+}
+
+.favorites-actions {
+  justify-self: end;
 }
 
 .favorites-actions,
@@ -225,9 +262,19 @@ onMounted(() => {
   cursor: pointer;
 }
 
+.favorites-content {
+  min-height: 0;
+  border: 1px solid var(--theme-surface-row-border);
+  background: var(--theme-surface-glass-card-background);
+  border-radius: 12px;
+  padding: 10px;
+  overflow: auto;
+}
+
 .favorites-list {
   display: grid;
   gap: 8px;
+  align-content: start;
 }
 
 .favorites-item {
@@ -246,6 +293,28 @@ onMounted(() => {
   gap: 2px;
 }
 
+.favorites-empty-panel {
+  min-height: 160px;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 10px;
+  padding: 8px;
+}
+
+.favorites-empty-action {
+  border: 1px solid var(--theme-accent-primary-button-border);
+  background: var(--theme-accent-primary-button-gradient);
+  color: var(--theme-accent-primary-button-text);
+  border-radius: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+
+.favorites-pagination {
+  justify-content: flex-end;
+}
+
 .tag-row,
 .meta,
 .eyebrow,
@@ -255,5 +324,25 @@ onMounted(() => {
 
 .error-message {
   color: var(--theme-text-danger-strong);
+}
+
+@media (max-width: 960px) {
+  .favorites-page {
+    padding: 14px 12px 12px;
+  }
+
+  .favorites-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .favorites-filters {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .favorites-actions {
+    justify-self: start;
+    grid-column: 1 / -1;
+  }
 }
 </style>

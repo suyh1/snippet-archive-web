@@ -12,6 +12,57 @@ async function cleanupWorkspaces(request: APIRequestContext) {
   }
 }
 
+async function readFavoritesGeometry(page: Parameters<typeof test>[0]['page']) {
+  return page.evaluate(() => {
+    const root = document.querySelector('[data-testid="favorites-page"]') as HTMLElement | null
+    const header = document.querySelector('.favorites-header') as HTMLElement | null
+    const filters = document.querySelector('.favorites-filters') as HTMLElement | null
+    const contentShell = document.querySelector('[data-testid="favorites-content"]') as HTMLElement | null
+    const list = document.querySelector('[data-testid="favorites-list"]') as HTMLElement | null
+    const empty = document.querySelector('[data-testid="favorites-empty"]') as HTMLElement | null
+    const pagination = document.querySelector('footer.favorites-pagination') as HTMLElement | null
+    if (!root || !header || !filters || !contentShell) {
+      return null
+    }
+
+    const rootRect = root.getBoundingClientRect()
+    const headerRect = header.getBoundingClientRect()
+    const filtersRect = filters.getBoundingClientRect()
+    const contentShellRect = contentShell.getBoundingClientRect()
+    const paginationRect = pagination ? pagination.getBoundingClientRect() : null
+    const paginationVisible =
+      Boolean(pagination) &&
+      pagination!.getClientRects().length > 0 &&
+      window.getComputedStyle(pagination!).display !== 'none'
+
+    return {
+      gapHeaderToFilters: filtersRect.top - headerRect.bottom,
+      gapFiltersToContent: contentShellRect.top - filtersRect.bottom,
+      gapContentToPagination: paginationRect ? paginationRect.top - contentShellRect.bottom : null,
+      pageBottomInset: paginationRect ? rootRect.bottom - paginationRect.bottom : null,
+      hasList: Boolean(list),
+      hasEmpty: Boolean(empty),
+      paginationVisible,
+    }
+  })
+}
+
+test('favorites layout: empty state keeps compact vertical rhythm', async ({ page, request }) => {
+  await cleanupWorkspaces(request)
+  await page.goto('/favorites')
+
+  await expect(page.getByTestId('favorites-page')).toBeVisible()
+  await expect(page.getByTestId('favorites-empty')).toBeVisible()
+  await expect(page.locator('footer.favorites-pagination')).toHaveCount(0)
+
+  const geometry = await readFavoritesGeometry(page)
+  expect(geometry).not.toBeNull()
+  expect(geometry?.hasEmpty).toBe(true)
+  expect(geometry?.hasList).toBe(false)
+  expect(geometry?.gapHeaderToFilters).toBeLessThanOrEqual(28)
+  expect(geometry?.gapFiltersToContent).toBeLessThanOrEqual(28)
+})
+
 test('favorites flow: star workspace/file and filter by tag', async ({ page, request }) => {
   await cleanupWorkspaces(request)
 
@@ -64,6 +115,16 @@ test('favorites flow: star workspace/file and filter by tag', async ({ page, req
   await expect(page.getByTestId('floating-toolbar')).toBeVisible()
   await page.getByTestId('nav-favorites').click()
   await expect(page.getByTestId('favorites-page')).toBeVisible()
+  await expect(page.getByTestId('favorites-item')).toHaveCount(2)
+
+  const populatedGeometry = await readFavoritesGeometry(page)
+  expect(populatedGeometry).not.toBeNull()
+  expect(populatedGeometry?.hasList).toBe(true)
+  expect(populatedGeometry?.paginationVisible).toBe(true)
+  expect(populatedGeometry?.gapHeaderToFilters).toBeLessThanOrEqual(28)
+  expect(populatedGeometry?.gapFiltersToContent).toBeLessThanOrEqual(28)
+  expect(populatedGeometry?.gapContentToPagination).toBeLessThanOrEqual(28)
+  expect(populatedGeometry?.pageBottomInset).toBeGreaterThanOrEqual(8)
 
   await page.getByTestId('favorites-type-select').selectOption('workspace')
   await page.getByTestId('favorites-tag-input').fill('team')
