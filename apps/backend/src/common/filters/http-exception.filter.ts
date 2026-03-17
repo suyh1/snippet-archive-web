@@ -69,6 +69,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
   }
 
   private getErrorCodeByStatus(status: number) {
+    if (status === HttpStatus.UNAUTHORIZED) {
+      return 'UNAUTHORIZED' as const
+    }
+
+    if (status === HttpStatus.FORBIDDEN) {
+      return 'FORBIDDEN' as const
+    }
+
     if (status === HttpStatus.NOT_FOUND) {
       return 'NOT_FOUND' as const
     }
@@ -79,6 +87,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     if (status === HttpStatus.CONFLICT) {
       return 'CONFLICT' as const
+    }
+
+    if (status === HttpStatus.GONE) {
+      return 'GONE' as const
     }
 
     return 'INTERNAL_ERROR' as const

@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import { NestFastifyApplication } from '@nestjs/platform-fastify'
 import request from 'supertest'
+import { registerAccount, uniqueEmail, withAuth } from './helpers/auth'
 import { createTestApp } from './helpers/test-app'
 
 describe('Workspace API (e2e)', () => {
@@ -22,8 +23,11 @@ describe('Workspace API (e2e)', () => {
   })
 
   it('supports workspace CRUD', async () => {
+    const owner = await registerAccount(app, uniqueEmail('workspace-owner'), 'Workspace Owner')
+
     const created = await request(app.getHttpServer())
       .post('/api/workspaces')
+      .set(withAuth(owner.accessToken))
       .send({ title: 'Workspace A' })
 
     expect(created.status).toBe(201)
@@ -34,22 +38,25 @@ describe('Workspace API (e2e)', () => {
 
     const workspaceId = created.body.data.id
 
-    const listRes = await request(app.getHttpServer()).get('/api/workspaces')
+    const listRes = await request(app.getHttpServer())
+      .get('/api/workspaces')
+      .set(withAuth(owner.accessToken))
 
     expect(listRes.status).toBe(200)
     expect(Array.isArray(listRes.body.data.items)).toBe(true)
     expect(listRes.body.data.items).toHaveLength(1)
     expect(listRes.body.data.items[0].id).toBe(workspaceId)
 
-    const detailRes = await request(app.getHttpServer()).get(
-      `/api/workspaces/${workspaceId}`,
-    )
+    const detailRes = await request(app.getHttpServer())
+      .get(`/api/workspaces/${workspaceId}`)
+      .set(withAuth(owner.accessToken))
 
     expect(detailRes.status).toBe(200)
     expect(detailRes.body.data.id).toBe(workspaceId)
 
     const patchRes = await request(app.getHttpServer())
       .patch(`/api/workspaces/${workspaceId}`)
+      .set(withAuth(owner.accessToken))
       .send({
         title: 'Workspace A Updated',
         starred: true,
@@ -61,24 +68,40 @@ describe('Workspace API (e2e)', () => {
     expect(patchRes.body.data.starred).toBe(true)
     expect(patchRes.body.data.tags).toEqual(['backend'])
 
-    const deleteRes = await request(app.getHttpServer()).delete(
-      `/api/workspaces/${workspaceId}`,
-    )
+    const deleteRes = await request(app.getHttpServer())
+      .delete(`/api/workspaces/${workspaceId}`)
+      .set(withAuth(owner.accessToken))
 
     expect(deleteRes.status).toBe(200)
     expect(deleteRes.body.data).toEqual({ id: workspaceId })
 
-    const notFoundRes = await request(app.getHttpServer()).get(
-      `/api/workspaces/${workspaceId}`,
-    )
+    const notFoundRes = await request(app.getHttpServer())
+      .get(`/api/workspaces/${workspaceId}`)
+      .set(withAuth(owner.accessToken))
 
     expect(notFoundRes.status).toBe(404)
     expect(notFoundRes.body.error.code).toBe('NOT_FOUND')
   })
 
+  it('rejects workspace operations when authorization token is missing', async () => {
+    const createRes = await request(app.getHttpServer())
+      .post('/api/workspaces')
+      .send({ title: 'Unauthorized Workspace' })
+
+    expect(createRes.status).toBe(401)
+    expect(createRes.body.error.code).toBe('UNAUTHORIZED')
+
+    const listRes = await request(app.getHttpServer()).get('/api/workspaces')
+    expect(listRes.status).toBe(401)
+    expect(listRes.body.error.code).toBe('UNAUTHORIZED')
+  })
+
   it('validates payload for workspace creation', async () => {
+    const owner = await registerAccount(app, uniqueEmail('workspace-invalid'), 'Workspace Invalid')
+
     const res = await request(app.getHttpServer())
       .post('/api/workspaces')
+      .set(withAuth(owner.accessToken))
       .send({})
 
     expect(res.status).toBe(400)

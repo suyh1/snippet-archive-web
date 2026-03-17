@@ -3,13 +3,14 @@ import { AuditModule } from '../audit/audit.module'
 import { AuthModule } from '../auth/auth.module'
 import { PermissionModule } from '../permission/permission.module'
 import { PrismaModule } from '../prisma/prisma.module'
-import { WorkspaceController } from './workspace.controller'
-import { WorkspaceService } from './workspace.service'
+import { ShareAccessController } from './share-access.controller'
+import { ShareService } from './share.service'
+import { WorkspaceShareController } from './workspace-share.controller'
 
 @Module({
   imports: [PrismaModule, AuthModule, PermissionModule, AuditModule],
-  controllers: [WorkspaceController],
-  providers: [WorkspaceService],
-  exports: [WorkspaceService],
+  controllers: [WorkspaceShareController, ShareAccessController],
+  providers: [ShareService],
+  exports: [ShareService],
 })
-export class WorkspaceModule {}
+export class ShareModule {}

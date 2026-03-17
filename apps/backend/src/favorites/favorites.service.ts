@@ -1,4 +1,7 @@
-import { Inject, Injectable } from '@nestjs/common'
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common'
+import type { Prisma } from '@prisma/client'
+import type { AuthUser } from '../common/auth/auth-user'
+import { PermissionService } from '../permission/permission.service'
 import { PrismaService } from '../prisma/prisma.service'
 
 export type FavoritesQuery = {
@@ -25,15 +28,20 @@ export class FavoritesService {
   constructor(
     @Inject(PrismaService)
     private readonly prisma: PrismaService,
+    @Inject(PermissionService)
+    private readonly permissionService: PermissionService,
   ) {}
 
-  async listFavorites(query: FavoritesQuery) {
+  async listFavorites(query: FavoritesQuery, actor?: AuthUser) {
     const items: FavoriteItem[] = []
+    const workspaceVisibilityWhere = await this.buildWorkspaceVisibilityWhere(actor)
+    const fileVisibilityWhere = await this.buildFileVisibilityWhere(actor)
 
     if (query.type === 'all' || query.type === 'workspace') {
       const workspaces = await this.prisma.workspace.findMany({
         where: {
           starred: true,
+          ...workspaceVisibilityWhere,
           ...(query.tag ? { tags: { has: query.tag } } : {}),
         },
         orderBy: { updatedAt: 'desc' },
@@ -55,18 +63,22 @@ export class FavoritesService {
     }
 
     if (query.type === 'all' || query.type === 'file') {
+      const fileConditions: Prisma.WorkspaceFileWhereInput[] = [fileVisibilityWhere]
+
+      if (query.tag) {
+        fileConditions.push({
+          OR: [
+            { tags: { has: query.tag } },
+            { workspace: { tags: { has: query.tag } } },
+          ],
+        })
+      }
+
       const files = await this.prisma.workspaceFile.findMany({
         where: {
           kind: 'file',
           starred: true,
-          ...(query.tag
-            ? {
-                OR: [
-                  { tags: { has: query.tag } },
-                  { workspace: { tags: { has: query.tag } } },
-                ],
-              }
-            : {}),
+          AND: fileConditions,
         },
         include: {
           workspace: {
@@ -106,5 +118,59 @@ export class FavoritesService {
       page: query.page,
       pageSize: query.pageSize,
     }
+  }
+
+  private async buildWorkspaceVisibilityWhere(actor?: AuthUser) {
+    if (!actor?.id) {
+      throw new UnauthorizedException('Authorization token is required')
+    }
+
+    const organizationIds = await this.permissionService.listOrganizationIdsForUser(
+      actor.id,
+    )
+
+    if (organizationIds.length === 0) {
+      return { ownerId: actor.id } as Prisma.WorkspaceWhereInput
+    }
+
+    return {
+      OR: [
+        { ownerId: actor.id },
+        { organizationId: { in: organizationIds } },
+      ],
+    } as Prisma.WorkspaceWhereInput
+  }
+
+  private async buildFileVisibilityWhere(actor?: AuthUser) {
+    if (!actor?.id) {
+      throw new UnauthorizedException('Authorization token is required')
+    }
+
+    const organizationIds = await this.permissionService.listOrganizationIdsForUser(
+      actor.id,
+    )
+
+    if (organizationIds.length === 0) {
+      return {
+        workspace: {
+          ownerId: actor.id,
+        },
+      } as Prisma.WorkspaceFileWhereInput
+    }
+
+    return {
+      OR: [
+        {
+          workspace: {
+            ownerId: actor.id,
+          },
+        },
+        {
+          workspace: {
+            organizationId: { in: organizationIds },
+          },
+        },
+      ],
+    } as Prisma.WorkspaceFileWhereInput
   }
 }

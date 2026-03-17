@@ -1,5 +1,7 @@
-import { Inject, Injectable } from '@nestjs/common'
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
+import type { AuthUser } from '../common/auth/auth-user'
+import { PermissionService } from '../permission/permission.service'
 import { PrismaService } from '../prisma/prisma.service'
 
 export type SearchSnippetsQuery = {
@@ -18,10 +20,12 @@ export class SearchService {
   constructor(
     @Inject(PrismaService)
     private readonly prisma: PrismaService,
+    @Inject(PermissionService)
+    private readonly permissionService: PermissionService,
   ) {}
 
-  async searchSnippets(query: SearchSnippetsQuery) {
-    const where = this.buildWhere(query)
+  async searchSnippets(query: SearchSnippetsQuery, actor?: AuthUser) {
+    const where = await this.buildWhere(query, actor)
     const skip = (query.page - 1) * query.pageSize
 
     const [items, total] = await this.prisma.$transaction([
@@ -66,8 +70,14 @@ export class SearchService {
     }
   }
 
-  private buildWhere(query: SearchSnippetsQuery): Prisma.WorkspaceFileWhereInput {
+  private async buildWhere(
+    query: SearchSnippetsQuery,
+    actor?: AuthUser,
+  ): Promise<Prisma.WorkspaceFileWhereInput> {
     const andConditions: Prisma.WorkspaceFileWhereInput[] = []
+
+    const visibilityFilter = await this.buildVisibilityFilter(actor)
+    andConditions.push(visibilityFilter)
 
     if (query.workspaceId) {
       andConditions.push({ workspaceId: query.workspaceId })
@@ -109,6 +119,43 @@ export class SearchService {
     return {
       kind: 'file',
       ...(andConditions.length > 0 ? { AND: andConditions } : {}),
+    }
+  }
+
+  private async buildVisibilityFilter(
+    actor?: AuthUser,
+  ): Promise<Prisma.WorkspaceFileWhereInput> {
+    if (!actor?.id) {
+      throw new UnauthorizedException('Authorization token is required')
+    }
+
+    const organizationIds = await this.permissionService.listOrganizationIdsForUser(
+      actor.id,
+    )
+
+    if (organizationIds.length === 0) {
+      return {
+        workspace: {
+          ownerId: actor.id,
+        },
+      }
+    }
+
+    return {
+      OR: [
+        {
+          workspace: {
+            ownerId: actor.id,
+          },
+        },
+        {
+          workspace: {
+            organizationId: {
+              in: organizationIds,
+            },
+          },
+        },
+      ],
     }
   }
 }

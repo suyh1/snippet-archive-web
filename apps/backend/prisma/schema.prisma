@@ -7,8 +7,87 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum OrganizationRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
+enum ShareLinkVisibility {
+  PRIVATE
+  TEAM
+  PUBLIC
+}
+
+enum ShareLinkPermission {
+  READ
+}
+
+model User {
+  id                 String                  @id @default(uuid())
+  email              String                  @unique
+  name               String
+  passwordHash       String
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  sessions           Session[]
+  memberships        Membership[]
+  ownedOrganizations Organization[]          @relation("OrganizationOwner")
+  ownedWorkspaces    Workspace[]             @relation("WorkspaceOwner")
+  editedFiles        WorkspaceFile[]         @relation("FileEditor")
+  createdRevisions   WorkspaceFileRevision[] @relation("RevisionCreator")
+  createdShareLinks  ShareLink[]             @relation("ShareLinkCreator")
+  auditLogs          AuditLog[]              @relation("AuditActor")
+
+  @@index([email])
+}
+
+model Session {
+  id        String    @id @default(uuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model Organization {
+  id          String      @id @default(uuid())
+  name        String
+  slug        String      @unique
+  ownerId     String
+  owner       User        @relation("OrganizationOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  memberships Membership[]
+  workspaces  Workspace[]
+  shareLinks  ShareLink[]
+  auditLogs   AuditLog[]
+}
+
+model Membership {
+  id             String           @id @default(uuid())
+  organizationId String
+  userId         String
+  role           OrganizationRole
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId, role])
+}
+
 model Workspace {
   id           String          @id @default(uuid())
+  ownerId      String?
+  owner        User?           @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  organizationId String?
+  organization Organization?   @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   title        String
   description  String          @default("")
   tags         String[]
@@ -17,29 +96,38 @@ model Workspace {
   updatedAt    DateTime        @updatedAt
   lastOpenedAt DateTime?
   files        WorkspaceFile[]
+  shareLinks   ShareLink[]
+
+  @@index([organizationId, updatedAt])
+  @@index([ownerId, updatedAt])
 }
 
 model WorkspaceFile {
-  id          String    @id @default(uuid())
-  workspaceId String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  name        String
-  path        String
-  language    String
-  content     String    @default("")
-  tags        String[]  @default([])
-  starred     Boolean   @default(false)
-  kind        String
-  order       Int
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  revisions   WorkspaceFileRevision[]
+  id             String                  @id @default(uuid())
+  workspaceId    String
+  workspace      Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name           String
+  path           String
+  language       String
+  content        String                  @default("")
+  tags           String[]                @default([])
+  starred        Boolean                 @default(false)
+  kind           String
+  order          Int
+  isArchived     Boolean                 @default(false)
+  lastEditedById String?
+  lastEditedBy   User?                   @relation("FileEditor", fields: [lastEditedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  revisions      WorkspaceFileRevision[]
+  shareLinks     ShareLink[]
 
   @@index([workspaceId])
   @@index([workspaceId, path])
   @@index([workspaceId, language])
   @@index([workspaceId, updatedAt])
   @@index([workspaceId, starred])
+  @@index([workspaceId, isArchived])
 }
 
 model WorkspaceFileRevision {
@@ -51,8 +139,48 @@ model WorkspaceFileRevision {
   content     String
   source      String
   summary     String        @default("")
+  createdById String?
+  createdBy   User?         @relation("RevisionCreator", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime      @default(now())
 
   @@index([fileId, createdAt])
   @@index([workspaceId, fileId, createdAt])
+}
+
+model ShareLink {
+  id             String              @id @default(uuid())
+  organizationId String
+  workspaceId    String
+  fileId         String
+  token          String              @unique
+  visibility     ShareLinkVisibility
+  permission     ShareLinkPermission
+  createdById    String
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime            @default(now())
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace      Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  file           WorkspaceFile       @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  createdBy      User                @relation("ShareLinkCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, fileId, createdAt])
+  @@index([organizationId, visibility, expiresAt])
+}
+
+model AuditLog {
+  id             String       @id @default(uuid())
+  organizationId String
+  actorId        String?
+  action         String
+  resourceType   String
+  resourceId     String
+  payload        Json?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor          User?        @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, action, createdAt])
+  @@index([organizationId, actorId, createdAt])
 }

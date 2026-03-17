@@ -1,12 +1,18 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
+  UnauthorizedException,
 } from '@nestjs/common'
-import { Prisma, WorkspaceFile } from '@prisma/client'
+import { type OrganizationRole, Prisma, Workspace, WorkspaceFile } from '@prisma/client'
+import type { AuthUser } from '../common/auth/auth-user'
 import { PrismaService } from '../prisma/prisma.service'
+import { PermissionService } from '../permission/permission.service'
+import { AuditService } from '../audit/audit.service'
 import { CreateWorkspaceDto } from './dto/create-workspace.dto'
 import { CreateWorkspaceFileDto } from './dto/create-workspace-file.dto'
 import { MoveWorkspaceFileDto } from './dto/move-workspace-file.dto'
@@ -20,53 +26,109 @@ export class WorkspaceService {
   constructor(
     @Inject(PrismaService)
     private readonly prisma: PrismaService,
+    @Optional()
+    @Inject(PermissionService)
+    private readonly permissionService?: PermissionService,
+    @Optional()
+    @Inject(AuditService)
+    private readonly auditService?: AuditService,
   ) {}
 
-  async listWorkspaces() {
+  async listWorkspaces(actor?: AuthUser) {
+    const where = await this.buildWorkspaceVisibilityWhere(actor)
+
     return this.prisma.workspace.findMany({
+      where,
       orderBy: { updatedAt: 'desc' },
     })
   }
 
-  async getWorkspace(id: string) {
+  async getWorkspace(id: string, actor?: AuthUser) {
     const workspace = await this.prisma.workspace.findUnique({ where: { id } })
 
     if (!workspace) {
       throw new NotFoundException('Workspace not found')
     }
 
+    await this.ensureWorkspaceRole(workspace, actor, 'VIEWER')
     return workspace
   }
 
-  async createWorkspace(dto: CreateWorkspaceDto) {
-    return this.prisma.workspace.create({
+  async createWorkspace(dto: CreateWorkspaceDto, actor?: AuthUser) {
+    if (!actor?.id) {
+      throw new UnauthorizedException('Authorization token is required')
+    }
+
+    if (dto.organizationId) {
+      await this.requireOrganizationRole(dto.organizationId, actor, 'EDITOR')
+    }
+
+    const workspace = await this.prisma.workspace.create({
       data: {
         title: dto.title,
         description: dto.description ?? '',
         tags: dto.tags ?? [],
         starred: dto.starred ?? false,
+        ownerId: actor.id,
+        organizationId: dto.organizationId ?? null,
       },
     })
+
+    await this.recordWorkspaceAudit(
+      workspace,
+      actor?.id,
+      'WORKSPACE_CREATED',
+      'workspace',
+      workspace.id,
+      {
+        title: workspace.title,
+      },
+    )
+
+    return workspace
   }
 
-  async updateWorkspace(id: string, dto: UpdateWorkspaceDto) {
-    await this.getWorkspace(id)
+  async updateWorkspace(id: string, dto: UpdateWorkspaceDto, actor?: AuthUser) {
+    const workspace = await this.getWorkspace(id, actor)
+    await this.ensureWorkspaceRole(workspace, actor, 'EDITOR')
 
-    return this.prisma.workspace.update({
+    const updated = await this.prisma.workspace.update({
       where: { id },
       data: dto,
     })
+
+    await this.recordWorkspaceAudit(
+      workspace,
+      actor?.id,
+      'WORKSPACE_UPDATED',
+      'workspace',
+      workspace.id,
+      dto as Prisma.JsonObject,
+    )
+
+    return updated
   }
 
-  async deleteWorkspace(id: string) {
-    await this.getWorkspace(id)
+  async deleteWorkspace(id: string, actor?: AuthUser) {
+    const workspace = await this.getWorkspace(id, actor)
+    await this.ensureWorkspaceRole(workspace, actor, 'OWNER')
+
     await this.prisma.workspace.delete({ where: { id } })
+
+    await this.recordWorkspaceAudit(
+      workspace,
+      actor?.id,
+      'WORKSPACE_DELETED',
+      'workspace',
+      workspace.id,
+      null,
+    )
 
     return { id }
   }
 
-  async listWorkspaceFiles(workspaceId: string) {
-    await this.getWorkspace(workspaceId)
+  async listWorkspaceFiles(workspaceId: string, actor?: AuthUser) {
+    await this.getWorkspace(workspaceId, actor)
 
     return this.prisma.workspaceFile.findMany({
       where: { workspaceId },
@@ -74,7 +136,8 @@ export class WorkspaceService {
     })
   }
 
-  async getWorkspaceFile(workspaceId: string, fileId: string) {
+  async getWorkspaceFile(workspaceId: string, fileId: string, actor?: AuthUser) {
+    await this.getWorkspace(workspaceId, actor)
     const file = await this.findWorkspaceFile(workspaceId, fileId)
 
     if (!file) {
@@ -84,8 +147,13 @@ export class WorkspaceService {
     return file
   }
 
-  async createWorkspaceFile(workspaceId: string, dto: CreateWorkspaceFileDto) {
-    await this.getWorkspace(workspaceId)
+  async createWorkspaceFile(
+    workspaceId: string,
+    dto: CreateWorkspaceFileDto,
+    actor?: AuthUser,
+  ) {
+    const workspace = await this.getWorkspace(workspaceId, actor)
+    await this.ensureWorkspaceRole(workspace, actor, 'EDITOR')
 
     const normalizedPath = this.normalizePath(dto.path)
     this.assertPathNotRoot(normalizedPath)
@@ -102,21 +170,41 @@ export class WorkspaceService {
         starred: dto.starred ?? false,
         kind: dto.kind,
         order: dto.order,
+        lastEditedById: actor?.id ?? null,
       },
     })
 
     await this.normalizeWorkspaceOrders(workspaceId)
-    return this.getWorkspaceFile(workspaceId, created.id)
+
+    await this.recordWorkspaceAudit(
+      workspace,
+      actor?.id,
+      'WORKSPACE_FILE_CREATED',
+      'workspace_file',
+      created.id,
+      {
+        path: created.path,
+      },
+    )
+
+    return this.getWorkspaceFile(workspaceId, created.id, actor)
   }
 
   async updateWorkspaceFile(
     workspaceId: string,
     fileId: string,
     dto: UpdateWorkspaceFileDto,
+    actor?: AuthUser,
   ) {
-    const currentFile = await this.getWorkspaceFile(workspaceId, fileId)
+    const workspace = await this.getWorkspace(workspaceId, actor)
+    await this.ensureWorkspaceRole(workspace, actor, 'EDITOR')
 
-    const data: UpdateWorkspaceFileDto = { ...dto }
+    const currentFile = await this.getWorkspaceFile(workspaceId, fileId, actor)
+
+    const data: UpdateWorkspaceFileDto & { lastEditedById?: string | null } = {
+      ...dto,
+      lastEditedById: actor?.id ?? null,
+    }
     const shouldTrackRevision = this.shouldTrackRevisionForUpdate(currentFile, dto)
 
     if (dto.path !== undefined) {
@@ -132,17 +220,35 @@ export class WorkspaceService {
     })
 
     await this.normalizeWorkspaceOrders(workspaceId)
-    const updatedFile = await this.getWorkspaceFile(workspaceId, fileId)
+    const updatedFile = await this.getWorkspaceFile(workspaceId, fileId, actor)
 
     if (shouldTrackRevision) {
-      await this.createRevisionSnapshot(this.prisma, updatedFile, 'update')
+      await this.createRevisionSnapshot(
+        this.prisma,
+        updatedFile,
+        'update',
+        actor?.id,
+      )
     }
+
+    await this.recordWorkspaceAudit(
+      workspace,
+      actor?.id,
+      'WORKSPACE_FILE_UPDATED',
+      'workspace_file',
+      fileId,
+      dto as Prisma.JsonObject,
+    )
 
     return updatedFile
   }
 
-  async listWorkspaceFileRevisions(workspaceId: string, fileId: string) {
-    await this.getWorkspaceFile(workspaceId, fileId)
+  async listWorkspaceFileRevisions(
+    workspaceId: string,
+    fileId: string,
+    actor?: AuthUser,
+  ) {
+    await this.getWorkspaceFile(workspaceId, fileId, actor)
 
     return this.prisma.workspaceFileRevision.findMany({
       where: {
@@ -157,8 +263,11 @@ export class WorkspaceService {
     workspaceId: string,
     fileId: string,
     revisionId: string,
+    actor?: AuthUser,
   ) {
-    await this.getWorkspaceFile(workspaceId, fileId)
+    const workspace = await this.getWorkspace(workspaceId, actor)
+    await this.ensureWorkspaceRole(workspace, actor, 'EDITOR')
+    await this.getWorkspaceFile(workspaceId, fileId, actor)
 
     const revision = await this.prisma.workspaceFileRevision.findFirst({
       where: {
@@ -172,26 +281,44 @@ export class WorkspaceService {
       throw new NotFoundException('Workspace file revision not found')
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const restoredFile = await tx.workspaceFile.update({
+    const restoredFile = await this.prisma.$transaction(async (tx) => {
+      const file = await tx.workspaceFile.update({
         where: { id: fileId },
         data: {
           content: revision.content,
           language: revision.language,
+          lastEditedById: actor?.id ?? null,
         },
       })
 
-      await this.createRevisionSnapshot(tx, restoredFile, 'restore')
-      return restoredFile
+      await this.createRevisionSnapshot(tx, file, 'restore', actor?.id)
+      return file
     })
+
+    await this.recordWorkspaceAudit(
+      workspace,
+      actor?.id,
+      'WORKSPACE_FILE_RESTORED',
+      'workspace_file',
+      fileId,
+      {
+        revisionId,
+      },
+    )
+
+    return restoredFile
   }
 
   async moveWorkspaceFile(
     workspaceId: string,
     fileId: string,
     dto: MoveWorkspaceFileDto,
+    actor?: AuthUser,
   ) {
-    const file = await this.getWorkspaceFile(workspaceId, fileId)
+    const workspace = await this.getWorkspace(workspaceId, actor)
+    await this.ensureWorkspaceRole(workspace, actor, 'EDITOR')
+
+    const file = await this.getWorkspaceFile(workspaceId, fileId, actor)
     const targetPath = this.normalizePath(dto.targetPath)
 
     this.assertPathNotRoot(targetPath)
@@ -230,7 +357,10 @@ export class WorkspaceService {
 
           await tx.workspaceFile.update({
             where: { id: item.id },
-            data: { path: nextPath },
+            data: {
+              path: nextPath,
+              lastEditedById: actor?.id ?? null,
+            },
           })
         }
 
@@ -249,16 +379,32 @@ export class WorkspaceService {
         data: {
           path: targetPath,
           ...(dto.targetOrder !== undefined ? { order: dto.targetOrder } : {}),
+          lastEditedById: actor?.id ?? null,
         },
       })
     }
 
     await this.normalizeWorkspaceOrders(workspaceId)
-    return this.getWorkspaceFile(workspaceId, fileId)
+
+    await this.recordWorkspaceAudit(
+      workspace,
+      actor?.id,
+      'WORKSPACE_FILE_MOVED',
+      'workspace_file',
+      fileId,
+      {
+        targetPath,
+        targetOrder: dto.targetOrder ?? null,
+      },
+    )
+
+    return this.getWorkspaceFile(workspaceId, fileId, actor)
   }
 
-  async deleteWorkspaceFile(workspaceId: string, fileId: string) {
-    const file = await this.getWorkspaceFile(workspaceId, fileId)
+  async deleteWorkspaceFile(workspaceId: string, fileId: string, actor?: AuthUser) {
+    const workspace = await this.getWorkspace(workspaceId, actor)
+    await this.ensureWorkspaceRole(workspace, actor, 'EDITOR')
+    const file = await this.getWorkspaceFile(workspaceId, fileId, actor)
 
     if (file.kind === 'folder') {
       await this.prisma.workspaceFile.deleteMany({
@@ -272,6 +418,19 @@ export class WorkspaceService {
     }
 
     await this.normalizeWorkspaceOrders(workspaceId)
+
+    await this.recordWorkspaceAudit(
+      workspace,
+      actor?.id,
+      'WORKSPACE_FILE_DELETED',
+      'workspace_file',
+      fileId,
+      {
+        path: file.path,
+        kind: file.kind,
+      },
+    )
+
     return { id: fileId }
   }
 
@@ -385,6 +544,7 @@ export class WorkspaceService {
     client: PrismaService | Prisma.TransactionClient,
     file: Pick<WorkspaceFile, 'id' | 'workspaceId' | 'language' | 'content'>,
     source: RevisionSource,
+    actorId?: string,
   ) {
     await client.workspaceFileRevision.create({
       data: {
@@ -394,6 +554,7 @@ export class WorkspaceService {
         content: file.content,
         source,
         summary: this.buildRevisionSummary(file.content, source),
+        createdById: actorId ?? null,
       },
     })
   }
@@ -451,5 +612,95 @@ export class WorkspaceService {
     if (updates.length > 0) {
       await this.prisma.$transaction(updates)
     }
+  }
+
+  private async buildWorkspaceVisibilityWhere(actor?: AuthUser) {
+    if (!actor?.id) {
+      throw new UnauthorizedException('Authorization token is required')
+    }
+
+    if (!this.permissionService) {
+      return { ownerId: actor.id } as Prisma.WorkspaceWhereInput
+    }
+
+    const organizationIds = await this.permissionService.listOrganizationIdsForUser(
+      actor.id,
+    )
+
+    if (organizationIds.length === 0) {
+      return { ownerId: actor.id } as Prisma.WorkspaceWhereInput
+    }
+
+    return {
+      OR: [
+        { ownerId: actor.id },
+        { organizationId: { in: organizationIds } },
+      ],
+    } as Prisma.WorkspaceWhereInput
+  }
+
+  private async requireOrganizationRole(
+    organizationId: string,
+    actor: AuthUser | undefined,
+    minRole: OrganizationRole,
+  ) {
+    if (!this.permissionService) {
+      throw new UnauthorizedException('Permission service is not available')
+    }
+
+    await this.permissionService.requireMembership(
+      organizationId,
+      actor?.id,
+      minRole,
+    )
+  }
+
+  private async ensureWorkspaceRole(
+    workspace: Workspace,
+    actor: AuthUser | undefined,
+    minRole: OrganizationRole,
+  ) {
+    if (!workspace.organizationId) {
+      if (!workspace.ownerId) {
+        if (!actor?.id) {
+          throw new UnauthorizedException('Authorization token is required')
+        }
+        return
+      }
+
+      if (!actor?.id) {
+        throw new UnauthorizedException('Authorization token is required')
+      }
+
+      if (workspace.ownerId !== actor.id) {
+        throw new ForbiddenException('Workspace access denied')
+      }
+
+      return
+    }
+
+    await this.requireOrganizationRole(workspace.organizationId, actor, minRole)
+  }
+
+  private async recordWorkspaceAudit(
+    workspace: Workspace,
+    actorId: string | undefined,
+    action: string,
+    resourceType: string,
+    resourceId: string,
+    payload: Prisma.JsonValue,
+  ) {
+    if (!workspace.organizationId || !this.auditService) {
+      return
+    }
+
+    await this.auditService.record({
+      organizationId: workspace.organizationId,
+      actorId: actorId ?? null,
+      action,
+      resourceType,
+      resourceId,
+      payload,
+    })
   }
 }

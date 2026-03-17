@@ -4,7 +4,12 @@ import { WorkspaceService } from './workspace.service'
 function createPrismaMock() {
   return {
     workspace: {
-      findUnique: jest.fn(),
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'workspace-id',
+        title: 'Workspace',
+        organizationId: null,
+        ownerId: 'user-id',
+      }),
     },
     workspaceFile: {
       findFirst: jest.fn(),
@@ -17,6 +22,12 @@ function createPrismaMock() {
 }
 
 describe('WorkspaceService', () => {
+  const actor = {
+    id: 'user-id',
+    email: 'owner@example.com',
+    name: 'Owner',
+  }
+
   it('throws conflict when moving folder into descendant path', async () => {
     const prisma = createPrismaMock()
     prisma.workspaceFile.findFirst.mockResolvedValue({
@@ -35,7 +46,7 @@ describe('WorkspaceService', () => {
     await expect(
       service.moveWorkspaceFile('workspace-id', 'folder-id', {
         targetPath: '/src/child/src',
-      }),
+      }, actor),
     ).rejects.toThrow(ConflictException)
   })
 
@@ -44,6 +55,8 @@ describe('WorkspaceService', () => {
     prisma.workspace.findUnique.mockResolvedValue({
       id: 'workspace-id',
       title: 'Workspace',
+      organizationId: null,
+      ownerId: 'user-id',
     })
 
     const service = new WorkspaceService(prisma as never)
@@ -56,7 +69,7 @@ describe('WorkspaceService', () => {
         content: '',
         kind: 'file',
         order: 1,
-      }),
+      }, actor),
     ).rejects.toThrow(BadRequestException)
   })
 
@@ -94,7 +107,7 @@ describe('WorkspaceService', () => {
     const result = await service.moveWorkspaceFile('workspace-id', 'file-id', {
       targetPath: '/dst/a.ts',
       targetOrder: 1,
-    })
+    }, actor)
 
     expect(result.path).toBe('/dst/a.ts')
     expect(prisma.workspaceFile.update).toHaveBeenCalledWith({
@@ -102,6 +115,7 @@ describe('WorkspaceService', () => {
       data: {
         path: '/dst/a.ts',
         order: 1,
+        lastEditedById: 'user-id',
       },
     })
   })
@@ -112,6 +126,8 @@ describe('WorkspaceService', () => {
     prisma.workspace.findUnique.mockResolvedValue({
       id: 'workspace-id',
       title: 'Workspace',
+      organizationId: null,
+      ownerId: 'user-id',
     })
 
     prisma.workspaceFile.findFirst
@@ -139,7 +155,7 @@ describe('WorkspaceService', () => {
       content: '',
       kind: 'file',
       order: 3,
-    })
+    }, actor)
 
     expect(result.path).toBe('/src/main.ts')
     expect(prisma.workspaceFile.create).toHaveBeenCalledWith({
@@ -153,6 +169,7 @@ describe('WorkspaceService', () => {
         starred: false,
         kind: 'file',
         order: 3,
+        lastEditedById: 'user-id',
       },
     })
   })
@@ -214,7 +231,7 @@ describe('WorkspaceService', () => {
     await service.moveWorkspaceFile('workspace-id', 'file-id', {
       targetPath: '/dst/a.ts',
       targetOrder: 99,
-    })
+    }, actor)
 
     expect(prisma.workspaceFile.update).toHaveBeenCalledWith({
       where: { id: 'file-id' },

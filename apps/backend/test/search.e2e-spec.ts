@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import { NestFastifyApplication } from '@nestjs/platform-fastify'
 import request from 'supertest'
+import { registerAccount, uniqueEmail, withAuth } from './helpers/auth'
 import { createTestApp } from './helpers/test-app'
 
 describe('Search API (e2e)', () => {
@@ -22,12 +23,15 @@ describe('Search API (e2e)', () => {
   })
 
   it('searches snippets by keyword over title/path/content', async () => {
+    const owner = await registerAccount(app, uniqueEmail('search-owner'), 'Search Owner')
+
     const workspace = await prisma.workspace.create({
       data: {
         title: 'Search Workspace',
         description: '',
         tags: ['searchable'],
         starred: false,
+        ownerId: owner.userId,
       },
     })
 
@@ -57,6 +61,7 @@ describe('Search API (e2e)', () => {
 
     const res = await request(app.getHttpServer())
       .get('/api/search/snippets')
+      .set(withAuth(owner.accessToken))
       .query({ keyword: 'token', page: 1, pageSize: 10 })
 
     expect(res.status).toBe(200)
@@ -70,13 +75,23 @@ describe('Search API (e2e)', () => {
     )
   })
 
+  it('rejects search query when authorization token is missing', async () => {
+    const res = await request(app.getHttpServer()).get('/api/search/snippets')
+
+    expect(res.status).toBe(401)
+    expect(res.body.error.code).toBe('UNAUTHORIZED')
+  })
+
   it('supports language and tag filters with stable pagination', async () => {
+    const owner = await registerAccount(app, uniqueEmail('search-filter-owner'), 'Search Filter Owner')
+
     const backendWorkspace = await prisma.workspace.create({
       data: {
         title: 'Backend Snippets',
         description: '',
         tags: ['backend'],
         starred: false,
+        ownerId: owner.userId,
       },
     })
 
@@ -86,6 +101,7 @@ describe('Search API (e2e)', () => {
         description: '',
         tags: ['frontend'],
         starred: false,
+        ownerId: owner.userId,
       },
     })
 
@@ -130,6 +146,7 @@ describe('Search API (e2e)', () => {
 
     const page1 = await request(app.getHttpServer())
       .get('/api/search/snippets')
+      .set(withAuth(owner.accessToken))
       .query({ language: 'typescript', tag: 'backend', page: 1, pageSize: 1 })
 
     expect(page1.status).toBe(200)

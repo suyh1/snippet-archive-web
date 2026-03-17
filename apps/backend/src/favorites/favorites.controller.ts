@@ -1,4 +1,8 @@
 import { BadRequestException, Controller, Get, Inject, Query } from '@nestjs/common'
+import { UseGuards } from '@nestjs/common'
+import { CurrentUser } from '../common/auth/current-user.decorator'
+import { RequiredAuthGuard } from '../common/auth/required-auth.guard'
+import type { AuthUser } from '../common/auth/auth-user'
 import { FavoritesService } from './favorites.service'
 
 function parsePositiveInt(
@@ -31,6 +35,7 @@ function parseFavoritesType(value?: string): 'all' | 'workspace' | 'file' {
 }
 
 @Controller('favorites')
+@UseGuards(RequiredAuthGuard)
 export class FavoritesController {
   constructor(
     @Inject(FavoritesService)
@@ -39,6 +44,7 @@ export class FavoritesController {
 
   @Get()
   async listFavorites(
+    @CurrentUser() currentUser: AuthUser | null,
     @Query('tag') tag?: string,
     @Query('type') type?: string,
     @Query('page') pageRaw?: string,
@@ -52,7 +58,7 @@ export class FavoritesController {
       type: parseFavoritesType(type),
       page,
       pageSize,
-    })
+    }, currentUser ?? undefined)
 
     return { data }
   }

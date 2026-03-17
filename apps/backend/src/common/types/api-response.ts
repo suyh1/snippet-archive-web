@@ -4,7 +4,14 @@ export type ApiSuccessResponse<T> = {
 
 export type ApiErrorResponse = {
   error: {
-    code: 'VALIDATION_ERROR' | 'NOT_FOUND' | 'CONFLICT' | 'INTERNAL_ERROR'
+    code:
+      | 'VALIDATION_ERROR'
+      | 'UNAUTHORIZED'
+      | 'FORBIDDEN'
+      | 'NOT_FOUND'
+      | 'CONFLICT'
+      | 'GONE'
+      | 'INTERNAL_ERROR'
     message: string
     details?: unknown
   }

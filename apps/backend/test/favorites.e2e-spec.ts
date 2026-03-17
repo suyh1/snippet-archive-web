@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import { NestFastifyApplication } from '@nestjs/platform-fastify'
 import request from 'supertest'
+import { registerAccount, uniqueEmail, withAuth } from './helpers/auth'
 import { createTestApp } from './helpers/test-app'
 
 describe('Favorites API (e2e)', () => {
@@ -22,12 +23,15 @@ describe('Favorites API (e2e)', () => {
   })
 
   it('aggregates starred workspaces and files', async () => {
+    const owner = await registerAccount(app, uniqueEmail('favorites-owner'), 'Favorites Owner')
+
     const workspaceA = await prisma.workspace.create({
       data: {
         title: 'Workspace A',
         description: '',
         tags: ['backend'],
         starred: true,
+        ownerId: owner.userId,
       },
     })
 
@@ -37,6 +41,7 @@ describe('Favorites API (e2e)', () => {
         description: '',
         tags: ['frontend'],
         starred: false,
+        ownerId: owner.userId,
       },
     })
 
@@ -70,6 +75,7 @@ describe('Favorites API (e2e)', () => {
 
     const res = await request(app.getHttpServer())
       .get('/api/favorites')
+      .set(withAuth(owner.accessToken))
       .query({ page: 1, pageSize: 20 })
 
     expect(res.status).toBe(200)
@@ -82,13 +88,23 @@ describe('Favorites API (e2e)', () => {
     )
   })
 
+  it('rejects favorites query when authorization token is missing', async () => {
+    const res = await request(app.getHttpServer()).get('/api/favorites')
+
+    expect(res.status).toBe(401)
+    expect(res.body.error.code).toBe('UNAUTHORIZED')
+  })
+
   it('filters favorites by tag and type', async () => {
+    const owner = await registerAccount(app, uniqueEmail('favorites-filter-owner'), 'Favorites Filter Owner')
+
     const workspaceA = await prisma.workspace.create({
       data: {
         title: 'Workspace A',
         description: '',
         tags: ['backend'],
         starred: true,
+        ownerId: owner.userId,
       },
     })
 
@@ -108,6 +124,7 @@ describe('Favorites API (e2e)', () => {
 
     const res = await request(app.getHttpServer())
       .get('/api/favorites')
+      .set(withAuth(owner.accessToken))
       .query({ tag: 'backend', type: 'file', page: 1, pageSize: 20 })
 
     expect(res.status).toBe(200)

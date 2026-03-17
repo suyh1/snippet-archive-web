@@ -3,13 +3,15 @@ import {
   Controller,
   Get,
   Inject,
+  Param,
+  ParseUUIDPipe,
   Query,
   UseGuards,
 } from '@nestjs/common'
 import { CurrentUser } from '../common/auth/current-user.decorator'
 import { RequiredAuthGuard } from '../common/auth/required-auth.guard'
 import type { AuthUser } from '../common/auth/auth-user'
-import { SearchService } from './search.service'
+import { AuditService } from './audit.service'
 
 function parseOptionalDate(value?: string): Date | undefined {
   if (!value) {
@@ -41,39 +43,40 @@ function parsePositiveInt(
   return parsed
 }
 
-@Controller('search')
+@Controller('organizations/:organizationId/audit-logs')
 @UseGuards(RequiredAuthGuard)
-export class SearchController {
+export class AuditController {
   constructor(
-    @Inject(SearchService)
-    private readonly searchService: SearchService,
+    @Inject(AuditService)
+    private readonly auditService: AuditService,
   ) {}
 
-  @Get('snippets')
-  async searchSnippets(
+  @Get()
+  async listOrganizationAuditLogs(
+    @Param('organizationId', new ParseUUIDPipe()) organizationId: string,
     @CurrentUser() currentUser: AuthUser | null,
-    @Query('keyword') keyword?: string,
-    @Query('language') language?: string,
-    @Query('tag') tag?: string,
-    @Query('workspaceId') workspaceId?: string,
-    @Query('updatedFrom') updatedFrom?: string,
-    @Query('updatedTo') updatedTo?: string,
+    @Query('action') action?: string,
+    @Query('actorId') actorId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
     @Query('page') pageRaw?: string,
     @Query('pageSize') pageSizeRaw?: string,
   ) {
     const page = parsePositiveInt(pageRaw, 1, 'page')
     const pageSize = Math.min(parsePositiveInt(pageSizeRaw, 20, 'pageSize'), 100)
 
-    const data = await this.searchService.searchSnippets({
-      keyword: keyword?.trim() || undefined,
-      language: language?.trim() || undefined,
-      tag: tag?.trim() || undefined,
-      workspaceId: workspaceId?.trim() || undefined,
-      updatedFrom: parseOptionalDate(updatedFrom),
-      updatedTo: parseOptionalDate(updatedTo),
-      page,
-      pageSize,
-    }, currentUser ?? undefined)
+    const data = await this.auditService.listOrganizationAuditLogs(
+      organizationId,
+      currentUser!.id,
+      {
+        action: action?.trim() || undefined,
+        actorId: actorId?.trim() || undefined,
+        from: parseOptionalDate(from),
+        to: parseOptionalDate(to),
+        page,
+        pageSize,
+      },
+    )
 
     return { data }
   }

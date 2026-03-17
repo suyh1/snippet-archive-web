@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsString,
   ArrayMaxSize,
+  IsUUID,
 } from 'class-validator'
 
 export class CreateWorkspaceDto {
@@ -23,4 +24,8 @@ export class CreateWorkspaceDto {
   @IsOptional()
   @IsBoolean()
   starred?: boolean
+
+  @IsOptional()
+  @IsUUID()
+  organizationId?: string
 }
