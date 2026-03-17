@@ -33,6 +33,7 @@ async function submitSearch() {
 
 async function clearSearch() {
   searchStore.clearFilters()
+  await searchStore.runSearch({ resetPage: true })
 }
 
 function onKeywordEsc() {
@@ -75,7 +76,7 @@ function openResult(item: SearchSnippet) {
       <p class="meta">{{ total }} 条结果</p>
     </header>
 
-    <section class="search-filters">
+    <section class="search-filters" data-testid="search-filters">
       <form class="search-form" @submit.prevent="submitSearch">
         <label>
           关键词
@@ -178,22 +179,26 @@ function openResult(item: SearchSnippet) {
 
     <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
 
-    <section v-if="hasResults" class="search-results" data-testid="search-result-list">
-      <article v-for="item in items" :key="item.id" class="search-result-item" data-testid="search-result-item">
-        <div class="search-result-meta">
-          <strong>{{ item.name }}</strong>
-          <span>{{ item.workspaceTitle }}</span>
-          <code>{{ item.path }}</code>
-        </div>
-        <button data-testid="search-result-open" type="button" @click="openResult(item)">打开</button>
-      </article>
+    <section class="search-content" data-testid="search-content">
+      <section v-if="hasResults" class="search-results" data-testid="search-result-list">
+        <article v-for="item in items" :key="item.id" class="search-result-item" data-testid="search-result-item">
+          <div class="search-result-meta">
+            <strong>{{ item.name }}</strong>
+            <span>{{ item.workspaceTitle }}</span>
+            <code>{{ item.path }}</code>
+          </div>
+          <button data-testid="search-result-open" type="button" @click="openResult(item)">打开</button>
+        </article>
+      </section>
+
+      <section v-else class="search-empty-panel" data-testid="search-empty-panel">
+        <p class="empty-note" data-testid="search-empty">
+          {{ loading ? '正在检索...' : '暂无结果，请调整关键词或筛选条件。' }}
+        </p>
+      </section>
     </section>
 
-    <p v-else class="empty-note" data-testid="search-empty">
-      {{ loading ? '正在检索...' : '暂无结果，请调整关键词或筛选条件。' }}
-    </p>
-
-    <footer class="search-pagination">
+    <footer v-if="hasResults" class="search-pagination" data-testid="search-pagination">
       <button
         data-testid="search-page-prev"
         type="button"
@@ -218,21 +223,43 @@ function openResult(item: SearchSnippet) {
 <style scoped>
 .search-page {
   display: grid;
-  gap: 16px;
-  padding: 20px;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  align-content: start;
+  gap: 12px;
+  padding: 18px 16px 16px;
   min-height: 100%;
+  width: min(1280px, 100%);
+  margin: 0 auto;
 }
 
 .search-header {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
+  gap: 12px;
+  padding: 12px 118px 12px 14px;
+  border: 1px solid var(--theme-surface-row-border);
+  border-radius: 14px;
+  background: var(--theme-surface-glass-card-background);
+  backdrop-filter: var(--theme-surface-overlay-blur);
+}
+
+.search-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  gap: 12px;
+  border: 1px solid var(--theme-surface-row-border);
+  border-radius: 12px;
+  background: var(--theme-surface-glass-card-background);
+  backdrop-filter: var(--theme-surface-overlay-blur);
+  padding: 10px 12px;
 }
 
 .search-form {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-content: start;
 }
 
 .search-form label {
@@ -271,6 +298,31 @@ function openResult(item: SearchSnippet) {
 .preset-block {
   display: grid;
   gap: 8px;
+  align-content: start;
+}
+
+.preset-block label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.preset-block input {
+  min-height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--theme-surface-neutral-button-border);
+  background: var(--theme-surface-input-background);
+  color: var(--theme-text-primary);
+  padding: 0 10px;
+}
+
+.search-content {
+  min-height: 0;
+  border: 1px solid var(--theme-surface-row-border);
+  background: var(--theme-surface-glass-card-background);
+  border-radius: 12px;
+  padding: 10px;
+  overflow: auto;
 }
 
 .preset-list {
@@ -285,6 +337,7 @@ function openResult(item: SearchSnippet) {
 .search-results {
   display: grid;
   gap: 10px;
+  align-content: start;
 }
 
 .search-result-item {
@@ -303,6 +356,14 @@ function openResult(item: SearchSnippet) {
   gap: 2px;
 }
 
+.search-empty-panel {
+  min-height: 150px;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  padding: 8px;
+}
+
 .search-pagination {
   display: flex;
   align-items: center;
@@ -318,5 +379,21 @@ function openResult(item: SearchSnippet) {
 .meta,
 .eyebrow {
   color: var(--theme-text-tertiary);
+}
+
+@media (max-width: 960px) {
+  .search-page {
+    padding: 14px 12px 12px;
+  }
+
+  .search-header {
+    flex-direction: column;
+    align-items: flex-start;
+    padding-right: 74px;
+  }
+
+  .search-filters {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
