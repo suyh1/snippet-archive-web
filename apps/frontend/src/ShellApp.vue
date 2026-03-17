@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
+import { authApi } from '@/api/auth'
+import { setAuthToken } from '@/api/http'
 import { workspaceApi } from '@/api/workspaces'
 import type { Workspace } from '@/types/workspace'
 import {
@@ -13,8 +15,11 @@ const route = useRoute()
 const router = useRouter()
 
 const toolbarOpen = ref(false)
+const mainNavRef = ref<HTMLElement | null>(null)
 const floatingToolbarRef = ref<HTMLElement | null>(null)
 const topActionsRef = ref<HTMLElement | null>(null)
+const contentTopInset = ref(0)
+const loggingOut = ref(false)
 const quickCaptureOpen = ref(false)
 const quickCaptureLoading = ref(false)
 const quickCaptureSubmitting = ref(false)
@@ -39,6 +44,7 @@ function isActive(path: string) {
   return route.path === path
 }
 
+const isLoginRoute = computed(() => route.path === '/login')
 const isSettingsRoute = computed(() => route.path === '/settings')
 
 function buildQuickCaptureNameSeed() {
@@ -111,6 +117,10 @@ async function loadQuickCaptureWorkspaces() {
 }
 
 async function openQuickCaptureDialog() {
+  if (isLoginRoute.value) {
+    return
+  }
+
   toolbarOpen.value = false
   quickCaptureOpen.value = true
   resetQuickCaptureForm()
@@ -126,10 +136,19 @@ function closeQuickCaptureDialog() {
 }
 
 function toggleFloatingToolbar() {
+  if (isLoginRoute.value) {
+    return
+  }
+
   toolbarOpen.value = !toolbarOpen.value
 }
 
 function handleToolbarOutsidePointerDown(event: MouseEvent) {
+  if (isLoginRoute.value) {
+    toolbarOpen.value = false
+    return
+  }
+
   if (!toolbarOpen.value) {
     return
   }
@@ -210,7 +229,67 @@ function navigateToWorkspace() {
   void router.push('/workspace')
 }
 
+async function logoutToLogin() {
+  if (isLoginRoute.value || loggingOut.value) {
+    return
+  }
+
+  toolbarOpen.value = false
+  quickCaptureOpen.value = false
+  loggingOut.value = true
+
+  try {
+    await authApi.logout()
+  } catch {
+    setAuthToken(null)
+  } finally {
+    setAuthToken(null)
+    loggingOut.value = false
+  }
+
+  await router.replace('/login')
+}
+
+function updateContentTopInset() {
+  if (isLoginRoute.value) {
+    contentTopInset.value = 0
+    return
+  }
+
+  const navBottom = mainNavRef.value?.getBoundingClientRect().bottom ?? 0
+  const topActionsBottom = topActionsRef.value?.getBoundingClientRect().bottom ?? 0
+  const insetBase = Math.max(navBottom, topActionsBottom)
+  contentTopInset.value = Math.max(0, Math.ceil(insetBase + 10))
+}
+
+function scheduleContentTopInsetUpdate() {
+  void nextTick(() => {
+    updateContentTopInset()
+  })
+}
+
+function handleViewportResize() {
+  updateContentTopInset()
+}
+
+watch(
+  () => route.path,
+  (path) => {
+    if (path === '/login') {
+      toolbarOpen.value = false
+      quickCaptureOpen.value = false
+    }
+
+    scheduleContentTopInsetUpdate()
+  },
+  { immediate: true },
+)
+
 function handleGlobalQuickCaptureShortcut(event: KeyboardEvent) {
+  if (isLoginRoute.value) {
+    return
+  }
+
   if (event.key === 'Escape') {
     if (quickCaptureOpen.value) {
       event.preventDefault()
@@ -244,18 +323,70 @@ function handleGlobalQuickCaptureShortcut(event: KeyboardEvent) {
 onMounted(() => {
   window.addEventListener('keydown', handleGlobalQuickCaptureShortcut)
   window.addEventListener('mousedown', handleToolbarOutsidePointerDown)
+  window.addEventListener('resize', handleViewportResize)
+  scheduleContentTopInsetUpdate()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleGlobalQuickCaptureShortcut)
   window.removeEventListener('mousedown', handleToolbarOutsidePointerDown)
+  window.removeEventListener('resize', handleViewportResize)
 })
 </script>
 
 <template>
   <div class="route-shell" data-testid="route-shell">
+    <nav
+      v-if="!isLoginRoute"
+      ref="mainNavRef"
+      class="route-shell-main-nav"
+      data-testid="app-main-nav"
+      aria-label="页面主导航"
+    >
+      <RouterLink
+        data-testid="main-nav-workspace"
+        class="main-nav-link"
+        :class="{ active: isActive('/workspace') }"
+        to="/workspace"
+      >
+        工作区
+      </RouterLink>
+      <RouterLink
+        data-testid="main-nav-search"
+        class="main-nav-link"
+        :class="{ active: isActive('/search') }"
+        to="/search"
+      >
+        搜索
+      </RouterLink>
+      <RouterLink
+        data-testid="main-nav-favorites"
+        class="main-nav-link"
+        :class="{ active: isActive('/favorites') }"
+        to="/favorites"
+      >
+        收藏
+      </RouterLink>
+      <RouterLink
+        data-testid="main-nav-team"
+        class="main-nav-link"
+        :class="{ active: isActive('/team') }"
+        to="/team"
+      >
+        团队
+      </RouterLink>
+      <RouterLink
+        data-testid="main-nav-settings"
+        class="main-nav-link"
+        :class="{ active: isActive('/settings') }"
+        to="/settings"
+      >
+        设置
+      </RouterLink>
+    </nav>
+
     <header
-      v-if="toolbarOpen"
+      v-if="toolbarOpen && !isLoginRoute"
       ref="floatingToolbarRef"
       class="route-shell-header"
       data-testid="floating-toolbar"
@@ -286,6 +417,14 @@ onBeforeUnmount(() => {
         >
           收藏
         </RouterLink>
+        <RouterLink
+          data-testid="nav-team"
+          class="route-shell-link"
+          :class="{ active: isActive('/team') }"
+          to="/team"
+        >
+          团队
+        </RouterLink>
         <button
           type="button"
           class="route-shell-link route-shell-capture-link"
@@ -298,6 +437,7 @@ onBeforeUnmount(() => {
     </header>
 
     <div
+      v-if="!isLoginRoute"
       ref="topActionsRef"
       class="route-shell-top-actions"
     >
@@ -331,6 +471,19 @@ onBeforeUnmount(() => {
       </RouterLink>
       <button
         type="button"
+        class="route-shell-icon-action"
+        data-testid="global-logout"
+        aria-label="退出登录"
+        title="退出登录"
+        :disabled="loggingOut"
+        @click="logoutToLogin"
+      >
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M11.2 3.3a.9.9 0 0 1 0 1.8H7.3A2.3 2.3 0 0 0 5 7.4v5.2a2.3 2.3 0 0 0 2.3 2.3h3.9a.9.9 0 1 1 0 1.8H7.3a4.1 4.1 0 0 1-4.1-4.1V7.4a4.1 4.1 0 0 1 4.1-4.1h3.9Zm2.7 3.5a.9.9 0 0 1 1.3 0l2.6 2.6a.9.9 0 0 1 0 1.2l-2.6 2.6a.9.9 0 1 1-1.3-1.2l1.1-1.1H9.3a.9.9 0 1 1 0-1.8H15l-1.1-1.1a.9.9 0 0 1 0-1.2Z" />
+        </svg>
+      </button>
+      <button
+        type="button"
         class="route-shell-icon-action primary"
         data-testid="toolbar-toggle"
         aria-label="显示工具栏（Ctrl/Cmd + Shift + K）"
@@ -343,13 +496,17 @@ onBeforeUnmount(() => {
       </button>
     </div>
 
-    <section class="route-shell-content">
+    <section
+      class="route-shell-content"
+      :class="{ 'route-shell-content-login': isLoginRoute }"
+      :style="{ '--route-shell-content-top-inset': `${contentTopInset}px` }"
+    >
       <RouterView />
     </section>
 
     <Teleport to="body">
       <div
-        v-if="quickCaptureOpen"
+        v-if="quickCaptureOpen && !isLoginRoute"
         class="quick-capture-float"
         data-testid="quick-capture-dialog"
       >
@@ -467,6 +624,36 @@ onBeforeUnmount(() => {
   min-height: 100vh;
   background: radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 45%),
     var(--theme-layout-app-shell-background);
+}
+
+.route-shell-main-nav {
+  position: fixed;
+  top: 12px;
+  left: 18px;
+  z-index: 25;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-width: calc(100vw - 180px);
+}
+
+.main-nav-link {
+  text-decoration: none;
+  border: 1px solid var(--theme-surface-statusbar-border);
+  border-radius: 999px;
+  padding: 6px 12px;
+  color: var(--theme-text-secondary);
+  background: var(--theme-surface-glass-header-background);
+  backdrop-filter: var(--theme-surface-overlay-blur);
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.main-nav-link.active {
+  border-color: var(--theme-accent-selected-border);
+  background: var(--theme-surface-row-active-background);
+  color: var(--theme-accent-selected-text);
 }
 
 .route-shell-header {
@@ -592,6 +779,11 @@ onBeforeUnmount(() => {
   line-height: 1;
   appearance: none;
   -webkit-appearance: none;
+}
+
+.route-shell-icon-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .route-shell-icon-action svg {
@@ -737,6 +929,18 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 900px) {
+  .route-shell-main-nav {
+    left: 12px;
+    top: 10px;
+    max-width: calc(100vw - 132px);
+    gap: 6px;
+  }
+
+  .main-nav-link {
+    padding: 6px 9px;
+    font-size: 12px;
+  }
+
   .route-shell-header {
     top: min(14vh, 90px);
     padding: 7px 9px;

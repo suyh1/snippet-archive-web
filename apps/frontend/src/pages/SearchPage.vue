@@ -226,7 +226,7 @@ function openResult(item: SearchSnippet) {
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   align-content: start;
   gap: 12px;
-  padding: 18px 16px 16px;
+  padding: calc(var(--route-shell-content-top-inset, 0px) + 18px) 16px 16px;
   min-height: 100%;
   width: min(1280px, 100%);
   margin: 0 auto;
@@ -383,7 +383,7 @@ function openResult(item: SearchSnippet) {
 
 @media (max-width: 960px) {
   .search-page {
-    padding: 14px 12px 12px;
+    padding: calc(var(--route-shell-content-top-inset, 0px) + 14px) 12px 12px;
   }
 
   .search-header {

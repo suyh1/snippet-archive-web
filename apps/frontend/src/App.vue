@@ -1677,10 +1677,12 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .app-shell {
+  box-sizing: border-box;
   height: 100%;
   min-height: 0;
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
+  padding-top: var(--route-shell-content-top-inset, 0px);
   font-family: var(--theme-layout-app-font-family);
   overflow: hidden;
   background: var(--theme-layout-app-shell-background);
@@ -1707,7 +1709,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 10px;
   /* Leave room for shell-level fixed icons at top-right to avoid text overlap. */
-  padding-right: 104px;
+  padding-right: 148px;
 }
 
 .eyebrow {

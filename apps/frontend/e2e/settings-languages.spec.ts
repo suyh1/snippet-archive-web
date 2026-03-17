@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import { readFile } from 'node:fs/promises'
 
 async function readSettingsLayoutMetrics(page: Parameters<typeof test>[0]['page']) {
