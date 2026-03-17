@@ -1,5 +1,7 @@
 export type Workspace = {
   id: string
+  ownerId?: string | null
+  organizationId?: string | null
   title: string
   description: string
   tags: string[]
@@ -42,6 +44,7 @@ export type CreateWorkspaceInput = {
   description?: string
   tags?: string[]
   starred?: boolean
+  organizationId?: string
 }
 
 export type CreateWorkspaceFileInput = {

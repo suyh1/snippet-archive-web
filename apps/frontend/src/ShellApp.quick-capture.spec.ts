@@ -38,6 +38,7 @@ function createTestRouter() {
       { path: '/workspace', component: WorkspaceView },
       { path: '/search', component: SearchView },
       { path: '/favorites', component: SearchView },
+      { path: '/team', component: SearchView },
       { path: '/settings', component: SearchView },
       { path: '/', redirect: '/workspace' },
     ],

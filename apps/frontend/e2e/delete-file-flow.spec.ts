@@ -1,4 +1,5 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import { expect, test } from './fixtures'
+import type { APIRequestContext, Page } from '@playwright/test'
 
 async function cleanupWorkspaces(request: APIRequestContext) {
   const listRes = await request.get('http://127.0.0.1:3001/api/workspaces')

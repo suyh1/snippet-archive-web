@@ -1,4 +1,5 @@
-import { expect, test, type APIRequestContext } from '@playwright/test'
+import { expect, test } from './fixtures'
+import type { APIRequestContext } from '@playwright/test'
 
 async function cleanupWorkspaces(request: APIRequestContext) {
   const listRes = await request.get('http://127.0.0.1:3001/api/workspaces')
@@ -35,7 +36,7 @@ test('quick capture supports global shortcut and creates file in selected worksp
   expect(toolbarStyle.backdropFilter).not.toBe('none')
   expect(toolbarStyle.boxShadow).not.toBe('none')
 
-  await page.locator('.route-shell-content').click({ position: { x: 40, y: 40 } })
+  await page.locator('.route-shell-content').click({ position: { x: 40, y: 140 } })
   await expect(page.getByTestId('floating-toolbar')).toHaveCount(0)
 
   await page.getByTestId('toolbar-toggle').click()
