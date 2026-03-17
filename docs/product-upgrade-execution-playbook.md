@@ -985,3 +985,13 @@ Z5 全局会话出口收口：
    - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
    - `npm run typecheck --workspace @snippet-archive/frontend`
    - `npm run build --workspace @snippet-archive/frontend`
+
+### 2026-03-18｜阶段二文档补齐（README + OpenAPI）
+
+1. 目标：同步阶段二接口与能力说明，补齐 README 与 Swagger/OpenAPI 文档缺口，并加回归守护防止文档再次滞后。
+2. 结果：
+   - OpenAPI：`docs/openapi/workspace-v1.yaml` 对齐当前阶段二接口，补充 token 约束、审计 payload 与错误详情 schema 表达。
+   - README：重写为阶段二现状说明，补齐登录入口/鉴权约束、API 文档入口、验证命令与文档维护约定。
+   - 回归：`apps/backend/test/swagger.e2e-spec.ts` 新增 `/docs/json` 断言，确保关键阶段二路径（auth/org/share/audit）存在。
+3. 验证命令（均通过）：
+   - `npm run test:e2e --workspace @snippet-archive/backend -- swagger.e2e-spec.ts`

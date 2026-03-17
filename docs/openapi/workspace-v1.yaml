@@ -1,14 +1,20 @@
 openapi: 3.0.3
 info:
-  title: Snippet Archive Workspace API
-  version: 1.0.0
-  description: Workspace and WorkspaceFile v1 endpoints.
+  title: Snippet Archive API
+  version: 2.0.0
+  description: |
+    Stage 2 API surface for Snippet Archive Web.
+    Includes authentication, organization collaboration, share links,
+    audit logs, workspace/file management, search and favorites.
 servers:
   - url: http://localhost:3001
+security:
+  - BearerAuth: []
 paths:
   /health:
     get:
       summary: Health check
+      security: []
       responses:
         '200':
           description: Service is healthy
@@ -21,9 +27,269 @@ paths:
                     type: string
                     example: ok
                 required: [status]
+
+  /api/auth/register:
+    post:
+      summary: Register account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterInput'
+      responses:
+        '201':
+          description: Registered and signed in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+
+  /api/auth/login:
+    post:
+      summary: Login account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+      responses:
+        '201':
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /api/auth/me:
+    get:
+      summary: Get current user
+      responses:
+        '200':
+          description: Current authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /api/auth/logout:
+    post:
+      summary: Logout current session
+      responses:
+        '201':
+          description: Session revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /api/organizations:
+    get:
+      summary: List organizations of current user
+      responses:
+        '200':
+          description: Organization list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationListResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    post:
+      summary: Create organization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrganizationInput'
+      responses:
+        '201':
+          description: Created organization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+
+  /api/organizations/{organizationId}/members:
+    get:
+      summary: List organization members
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+      responses:
+        '200':
+          description: Membership list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationMemberListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    post:
+      summary: Add or update organization member
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddMemberInput'
+      responses:
+        '201':
+          description: Membership upserted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationMemberResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/organizations/{organizationId}/members/{membershipId}:
+    patch:
+      summary: Update organization member role
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/MembershipId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMemberRoleInput'
+      responses:
+        '200':
+          description: Membership updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationMemberResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+    delete:
+      summary: Remove organization member
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/MembershipId'
+      responses:
+        '200':
+          description: Membership removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteIdResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+
+  /api/organizations/{organizationId}/audit-logs:
+    get:
+      summary: List organization audit logs (owner only)
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - name: action
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: actorId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
   /api/workspaces:
     get:
-      summary: List workspaces
+      summary: List workspaces visible to current user
       responses:
         '200':
           description: Workspace list
@@ -31,6 +297,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkspaceListResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
     post:
       summary: Create workspace
       requestBody:
@@ -48,6 +316,11 @@ paths:
                 $ref: '#/components/schemas/WorkspaceResponse'
         '400':
           $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
   /api/workspaces/{workspaceId}:
     get:
       summary: Get workspace detail
@@ -60,6 +333,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkspaceResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
         '404':
           $ref: '#/components/responses/NotFoundError'
     patch:
@@ -81,6 +360,10 @@ paths:
                 $ref: '#/components/schemas/WorkspaceResponse'
         '400':
           $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
         '404':
           $ref: '#/components/responses/NotFoundError'
     delete:
@@ -94,8 +377,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DeleteIdResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
         '404':
           $ref: '#/components/responses/NotFoundError'
+
   /api/workspaces/{workspaceId}/files:
     get:
       summary: List workspace files
@@ -108,6 +398,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkspaceFileListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
         '404':
           $ref: '#/components/responses/NotFoundError'
     post:
@@ -122,17 +418,22 @@ paths:
               $ref: '#/components/schemas/CreateWorkspaceFileInput'
       responses:
         '201':
-          description: Created file
+          description: Created workspace file
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkspaceFileResponse'
         '400':
           $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
         '404':
           $ref: '#/components/responses/NotFoundError'
         '409':
           $ref: '#/components/responses/ConflictError'
+
   /api/workspaces/{workspaceId}/files/{fileId}:
     get:
       summary: Get workspace file detail
@@ -146,6 +447,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkspaceFileResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
         '404':
           $ref: '#/components/responses/NotFoundError'
     patch:
@@ -168,6 +475,10 @@ paths:
                 $ref: '#/components/schemas/WorkspaceFileResponse'
         '400':
           $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
         '404':
           $ref: '#/components/responses/NotFoundError'
         '409':
@@ -184,8 +495,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DeleteIdResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
         '404':
           $ref: '#/components/responses/NotFoundError'
+
   /api/workspaces/{workspaceId}/files/{fileId}/revisions:
     get:
       summary: List workspace file revisions
@@ -199,8 +517,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkspaceFileRevisionListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
         '404':
           $ref: '#/components/responses/NotFoundError'
+
   /api/workspaces/{workspaceId}/files/{fileId}/revisions/{revisionId}/restore:
     post:
       summary: Restore workspace file by revision id
@@ -215,11 +540,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkspaceFileResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
         '404':
           $ref: '#/components/responses/NotFoundError'
+
   /api/workspaces/{workspaceId}/files/{fileId}/move:
     patch:
-      summary: Move workspace file/folder to target path
+      summary: Move workspace file or folder
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/FileId'
@@ -238,10 +570,15 @@ paths:
                 $ref: '#/components/schemas/WorkspaceFileResponse'
         '400':
           $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
         '404':
           $ref: '#/components/responses/NotFoundError'
         '409':
           $ref: '#/components/responses/ConflictError'
+
   /api/search/snippets:
     get:
       summary: Search snippets
@@ -303,6 +640,9 @@ paths:
                 $ref: '#/components/schemas/SearchSnippetListResponse'
         '400':
           $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
   /api/favorites:
     get:
       summary: List favorites
@@ -343,7 +683,109 @@ paths:
                 $ref: '#/components/schemas/FavoriteListResponse'
         '400':
           $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /api/workspaces/{workspaceId}/files/{fileId}/share-links:
+    get:
+      summary: List file share links
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/FileId'
+      responses:
+        '200':
+          description: Share link list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShareLinkListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    post:
+      summary: Create file share link
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/FileId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateShareLinkInput'
+      responses:
+        '201':
+          description: Share link created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShareLinkResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/workspaces/{workspaceId}/files/{fileId}/share-links/{shareLinkId}/revoke:
+    post:
+      summary: Revoke file share link
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/FileId'
+        - $ref: '#/components/parameters/ShareLinkId'
+      responses:
+        '201':
+          description: Share link revoked (idempotent)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShareLinkResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/share-links/{token}:
+    get:
+      summary: Resolve shared file by token
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ShareToken'
+      responses:
+        '200':
+          description: Shared file payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SharedFileAccessResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '410':
+          $ref: '#/components/responses/GoneError'
+
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token
+
   parameters:
     WorkspaceId:
       name: workspaceId
@@ -366,9 +808,52 @@ components:
       schema:
         type: string
         format: uuid
+    OrganizationId:
+      name: organizationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    MembershipId:
+      name: membershipId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ShareLinkId:
+      name: shareLinkId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ShareToken:
+      name: token
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 40
+        maxLength: 40
+        pattern: '^[a-f0-9]{40}$'
+
   responses:
     ValidationError:
       description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorResponse'
+    UnauthorizedError:
+      description: Authentication required or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorResponse'
+    ForbiddenError:
+      description: Permission denied
       content:
         application/json:
           schema:
@@ -385,13 +870,121 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ApiErrorResponse'
+    GoneError:
+      description: Resource has expired or been revoked
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorResponse'
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorResponse'
+
   schemas:
+    ApiError:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+            - VALIDATION_ERROR
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - NOT_FOUND
+            - CONFLICT
+            - GONE
+            - INTERNAL_ERROR
+        message:
+          type: string
+        details:
+          description: Validation detail list or extra error context
+          nullable: true
+          oneOf:
+            - type: array
+              items:
+                type: string
+            - type: object
+              additionalProperties: true
+            - type: string
+      required: [code, message]
+
+    ApiErrorResponse:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/ApiError'
+      required: [error]
+
+    AuthUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+      required: [id, email, name]
+
+    AuthSession:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/AuthUser'
+      required: [accessToken, expiresAt, user]
+
+    RegisterInput:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+      required: [email, name, password]
+
+    LoginInput:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+      required: [email, password]
+
     Workspace:
       type: object
       properties:
         id:
           type: string
           format: uuid
+        ownerId:
+          type: string
+          format: uuid
+          nullable: true
+        organizationId:
+          type: string
+          format: uuid
+          nullable: true
         title:
           type: string
         description:
@@ -412,7 +1005,18 @@ components:
           type: string
           format: date-time
           nullable: true
-      required: [id, title, description, tags, starred]
+      required:
+        - id
+        - ownerId
+        - organizationId
+        - title
+        - description
+        - tags
+        - starred
+        - createdAt
+        - updatedAt
+        - lastOpenedAt
+
     WorkspaceFile:
       type: object
       properties:
@@ -441,13 +1045,34 @@ components:
           enum: [file, folder]
         order:
           type: integer
+        isArchived:
+          type: boolean
+        lastEditedById:
+          type: string
+          format: uuid
+          nullable: true
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
-      required: [id, workspaceId, name, path, language, content, tags, starred, kind, order, createdAt, updatedAt]
+      required:
+        - id
+        - workspaceId
+        - name
+        - path
+        - language
+        - content
+        - tags
+        - starred
+        - kind
+        - order
+        - isArchived
+        - lastEditedById
+        - createdAt
+        - updatedAt
+
     WorkspaceFileRevision:
       type: object
       properties:
@@ -469,82 +1094,24 @@ components:
           enum: [update, restore]
         summary:
           type: string
+        createdById:
+          type: string
+          format: uuid
+          nullable: true
         createdAt:
           type: string
           format: date-time
-      required: [id, workspaceId, fileId, language, content, source, summary, createdAt]
-    CreateWorkspaceInput:
-      type: object
-      properties:
-        title:
-          type: string
-        description:
-          type: string
-        tags:
-          type: array
-          items:
-            type: string
-        starred:
-          type: boolean
-      required: [title]
-    UpdateWorkspaceInput:
-      type: object
-      properties:
-        title:
-          type: string
-        description:
-          type: string
-        tags:
-          type: array
-          items:
-            type: string
-        starred:
-          type: boolean
-    CreateWorkspaceFileInput:
-      type: object
-      properties:
-        name:
-          type: string
-        path:
-          type: string
-        language:
-          type: string
-        content:
-          type: string
-        kind:
-          type: string
-          enum: [file, folder]
-        order:
-          type: integer
-        tags:
-          type: array
-          items:
-            type: string
-        starred:
-          type: boolean
-      required: [name, path, language, kind, order]
-    UpdateWorkspaceFileInput:
-      type: object
-      properties:
-        name:
-          type: string
-        path:
-          type: string
-        language:
-          type: string
-        content:
-          type: string
-        kind:
-          type: string
-          enum: [file, folder]
-        order:
-          type: integer
-        tags:
-          type: array
-          items:
-            type: string
-        starred:
-          type: boolean
+      required:
+        - id
+        - workspaceId
+        - fileId
+        - language
+        - content
+        - source
+        - summary
+        - createdById
+        - createdAt
+
     SearchSnippet:
       type: object
       properties:
@@ -589,98 +1156,7 @@ components:
         - tags
         - content
         - updatedAt
-    MoveWorkspaceFileInput:
-      type: object
-      properties:
-        targetPath:
-          type: string
-        targetOrder:
-          type: integer
-          minimum: 1
-      required: [targetPath]
-    ApiError:
-      type: object
-      properties:
-        code:
-          type: string
-          enum: [VALIDATION_ERROR, NOT_FOUND, CONFLICT, INTERNAL_ERROR]
-        message:
-          type: string
-        details:
-          nullable: true
-      required: [code, message]
-    ApiErrorResponse:
-      type: object
-      properties:
-        error:
-          $ref: '#/components/schemas/ApiError'
-      required: [error]
-    WorkspaceResponse:
-      type: object
-      properties:
-        data:
-          $ref: '#/components/schemas/Workspace'
-      required: [data]
-    WorkspaceListResponse:
-      type: object
-      properties:
-        data:
-          type: object
-          properties:
-            items:
-              type: array
-              items:
-                $ref: '#/components/schemas/Workspace'
-          required: [items]
-      required: [data]
-    WorkspaceFileResponse:
-      type: object
-      properties:
-        data:
-          $ref: '#/components/schemas/WorkspaceFile'
-      required: [data]
-    WorkspaceFileListResponse:
-      type: object
-      properties:
-        data:
-          type: object
-          properties:
-            items:
-              type: array
-              items:
-                $ref: '#/components/schemas/WorkspaceFile'
-          required: [items]
-      required: [data]
-    WorkspaceFileRevisionListResponse:
-      type: object
-      properties:
-        data:
-          type: object
-          properties:
-            items:
-              type: array
-              items:
-                $ref: '#/components/schemas/WorkspaceFileRevision'
-          required: [items]
-      required: [data]
-    SearchSnippetListResponse:
-      type: object
-      properties:
-        data:
-          type: object
-          properties:
-            items:
-              type: array
-              items:
-                $ref: '#/components/schemas/SearchSnippet'
-            total:
-              type: integer
-            page:
-              type: integer
-            pageSize:
-              type: integer
-          required: [items, total, page, pageSize]
-      required: [data]
+
     FavoriteItem:
       type: object
       properties:
@@ -711,6 +1187,473 @@ components:
           type: string
           format: date-time
       required: [type, id, workspaceId, workspaceTitle, title, path, language, tags, starredAt]
+
+    OrganizationRole:
+      type: string
+      enum: [OWNER, EDITOR, VIEWER]
+
+    Organization:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        ownerId:
+          type: string
+          format: uuid
+        currentUserRole:
+          $ref: '#/components/schemas/OrganizationRole'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, name, slug, ownerId, currentUserRole, createdAt, updatedAt]
+
+    OrganizationMemberUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+      required: [id, email, name]
+
+    OrganizationMember:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        role:
+          $ref: '#/components/schemas/OrganizationRole'
+        createdAt:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/OrganizationMemberUser'
+      required: [id, organizationId, userId, role, createdAt, user]
+
+    ShareLinkVisibility:
+      type: string
+      enum: [PRIVATE, TEAM, PUBLIC]
+
+    ShareLinkPermission:
+      type: string
+      enum: [READ]
+
+    ShareLink:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        workspaceId:
+          type: string
+          format: uuid
+        fileId:
+          type: string
+          format: uuid
+        token:
+          type: string
+        visibility:
+          $ref: '#/components/schemas/ShareLinkVisibility'
+        permission:
+          $ref: '#/components/schemas/ShareLinkPermission'
+        createdById:
+          type: string
+          format: uuid
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - organizationId
+        - workspaceId
+        - fileId
+        - token
+        - visibility
+        - permission
+        - createdById
+        - expiresAt
+        - revokedAt
+        - createdAt
+
+    SharedWorkspace:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        organizationId:
+          type: string
+          format: uuid
+          nullable: true
+      required: [id, title, organizationId]
+
+    SharedFile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        workspaceId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        path:
+          type: string
+        language:
+          type: string
+        content:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, workspaceId, name, path, language, content, tags, updatedAt]
+
+    SharedFileAccess:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        token:
+          type: string
+        visibility:
+          $ref: '#/components/schemas/ShareLinkVisibility'
+        permission:
+          $ref: '#/components/schemas/ShareLinkPermission'
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        file:
+          $ref: '#/components/schemas/SharedFile'
+        workspace:
+          $ref: '#/components/schemas/SharedWorkspace'
+      required: [id, token, visibility, permission, expiresAt, createdAt, file, workspace]
+
+    AuditLogItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        actorId:
+          type: string
+          format: uuid
+          nullable: true
+        action:
+          type: string
+        resourceType:
+          type: string
+        resourceId:
+          type: string
+        payload:
+          description: JSON payload recorded with the audit event
+          nullable: true
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: array
+              items: {}
+            - type: string
+            - type: number
+            - type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, organizationId, actorId, action, resourceType, resourceId, payload, createdAt]
+
+    CreateWorkspaceInput:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+          maxItems: 50
+        starred:
+          type: boolean
+        organizationId:
+          type: string
+          format: uuid
+          nullable: true
+      required: [title]
+
+    UpdateWorkspaceInput:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+          maxItems: 50
+        starred:
+          type: boolean
+
+    CreateWorkspaceFileInput:
+      type: object
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        language:
+          type: string
+        content:
+          type: string
+        kind:
+          type: string
+          enum: [file, folder]
+        order:
+          type: integer
+          minimum: 0
+        tags:
+          type: array
+          items:
+            type: string
+          maxItems: 50
+        starred:
+          type: boolean
+      required: [name, path, language, kind, order]
+
+    UpdateWorkspaceFileInput:
+      type: object
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        language:
+          type: string
+        content:
+          type: string
+        kind:
+          type: string
+          enum: [file, folder]
+        order:
+          type: integer
+          minimum: 0
+        tags:
+          type: array
+          items:
+            type: string
+          maxItems: 50
+        starred:
+          type: boolean
+
+    MoveWorkspaceFileInput:
+      type: object
+      properties:
+        targetPath:
+          type: string
+        targetOrder:
+          type: integer
+          minimum: 1
+      required: [targetPath]
+
+    CreateOrganizationInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        slug:
+          type: string
+          minLength: 3
+          maxLength: 64
+          pattern: '^[a-z0-9-]+$'
+      required: [name, slug]
+
+    AddMemberInput:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/OrganizationRole'
+      required: [email, role]
+
+    UpdateMemberRoleInput:
+      type: object
+      properties:
+        role:
+          $ref: '#/components/schemas/OrganizationRole'
+      required: [role]
+
+    CreateShareLinkInput:
+      type: object
+      properties:
+        visibility:
+          $ref: '#/components/schemas/ShareLinkVisibility'
+        permission:
+          $ref: '#/components/schemas/ShareLinkPermission'
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+      required: [visibility]
+
+    DeleteIdResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+          required: [id]
+      required: [data]
+
+    AuthSessionResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/AuthSession'
+      required: [data]
+
+    AuthUserResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/AuthUser'
+      required: [data]
+
+    LogoutResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            success:
+              type: boolean
+          required: [success]
+      required: [data]
+
+    WorkspaceResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Workspace'
+      required: [data]
+
+    WorkspaceListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Workspace'
+          required: [items]
+      required: [data]
+
+    WorkspaceFileResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/WorkspaceFile'
+      required: [data]
+
+    WorkspaceFileListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/WorkspaceFile'
+          required: [items]
+      required: [data]
+
+    WorkspaceFileRevisionListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/WorkspaceFileRevision'
+          required: [items]
+      required: [data]
+
+    SearchSnippetListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/SearchSnippet'
+            total:
+              type: integer
+            page:
+              type: integer
+            pageSize:
+              type: integer
+          required: [items, total, page, pageSize]
+      required: [data]
+
     FavoriteListResponse:
       type: object
       properties:
@@ -729,14 +1672,89 @@ components:
               type: integer
           required: [items, total, page, pageSize]
       required: [data]
-    DeleteIdResponse:
+
+    OrganizationResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Organization'
+      required: [data]
+
+    OrganizationListResponse:
       type: object
       properties:
         data:
           type: object
           properties:
-            id:
-              type: string
-              format: uuid
-          required: [id]
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Organization'
+          required: [items]
+      required: [data]
+
+    OrganizationMemberResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/OrganizationMember'
+      required: [data]
+
+    OrganizationMemberListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrganizationMember'
+          required: [items]
+      required: [data]
+
+    ShareLinkResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/ShareLink'
+      required: [data]
+
+    ShareLinkListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/ShareLink'
+          required: [items]
+      required: [data]
+
+    SharedFileAccessResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/SharedFileAccess'
+      required: [data]
+
+    AuditLogListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/AuditLogItem'
+            total:
+              type: integer
+            page:
+              type: integer
+            pageSize:
+              type: integer
+          required: [items, total, page, pageSize]
       required: [data]
