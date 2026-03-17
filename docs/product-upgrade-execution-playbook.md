@@ -494,6 +494,26 @@ A6 完成标记：
    - `npm run typecheck --workspace @snippet-archive/frontend`
    - `npm run build`
 
+### 2026-03-17｜阶段一补充（右上角图标冲突修复 + 测试方法补洞）
+
+1. 目标：修复右上角入口图标重复渲染与头部文案遮挡问题，并将该类风险纳入 `TESTING.md` 的强制检查项。
+2. 结果：
+   - 冲突修复：统一右上角入口归属到 `ShellApp`（设置/返回 + 工具栏），移除 `App.vue` 页面层重复入口，避免同语义按钮双层渲染。
+   - 布局修复：`App.vue` 头部操作区为右上角固定图标组预留安全空间，消除 `meta` 文案与图标重叠。
+   - 回归补齐：`settings-languages` E2E 新增“入口唯一性 + 头部不重叠 + 同排 centerY + 断点覆盖”几何断言。
+   - 方法补洞：在 `TESTING.md` 增加“全局固定图标与页面头部冲突检查”专项条款与经验教训。
+3. 验证命令（均通过）：
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend -- e2e/settings-languages.spec.ts -g "settings page shows language list and supports tab switching"`
+   - `npm run test:run --workspace @snippet-archive/frontend -- src/ShellApp.quick-capture.spec.ts src/App.settings.spec.ts`
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend -- e2e/settings-languages.spec.ts`
+   - `npm run check:theme-contract --workspace @snippet-archive/frontend`
+   - `npm run test --workspace @snippet-archive/backend`
+   - `npm run test:e2e --workspace @snippet-archive/backend`
+   - `npm run test:run --workspace @snippet-archive/frontend`
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
+   - `npm run typecheck --workspace @snippet-archive/frontend`
+   - `npm run build`
+
 ## 12. 阶段一执行细化（线程 B：标签与收藏）
 
 ### 12.1 线程目标

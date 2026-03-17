@@ -529,30 +529,6 @@ watch(editorTheme, (theme) => {
   window.localStorage.setItem('editor-theme', theme)
 })
 
-function openSettings() {
-  if (props.mode === 'settings') {
-    return
-  }
-
-  void runWithUnsavedGuard(() => {
-    if (router) {
-      void router.push('/settings')
-      return
-    }
-
-    window.location.assign('/settings')
-  })
-}
-
-function backToWorkspaceView() {
-  if (router) {
-    void router.push('/workspace')
-    return
-  }
-
-  window.location.assign('/workspace')
-}
-
 function switchSettingsTab(tab: SettingsTab) {
   settingsTab.value = tab
 }
@@ -1115,36 +1091,6 @@ onBeforeUnmount(() => {
           <p class="meta">
             {{ headerMetaText }}
           </p>
-          <button
-            v-if="isSettingsView"
-            type="button"
-            class="head-action-icon"
-            data-testid="back-to-workspace"
-            aria-label="返回工作台"
-            title="返回工作台"
-            @click="backToWorkspaceView"
-          >
-            <svg viewBox="0 0 20 20" aria-hidden="true">
-              <path d="M7.8 4.6a.9.9 0 0 1 1.3 1.2L5.8 9.1h9.3a.9.9 0 1 1 0 1.8H5.8l3.3 3.3a.9.9 0 0 1-1.3 1.2L3 10.6a.9.9 0 0 1 0-1.2l4.8-4.8Z" />
-            </svg>
-            <span class="sr-only">返回工作台</span>
-          </button>
-          <button
-            v-else
-            type="button"
-            class="head-action-icon"
-            data-testid="open-settings"
-            aria-label="打开设置"
-            title="打开设置"
-            @click="openSettings"
-          >
-            <svg viewBox="0 0 20 20" aria-hidden="true">
-              <path
-                d="M9.9 2.2a.9.9 0 0 1 1.8 0l.2 1.4a6.8 6.8 0 0 1 1.8.8l1.2-.7a.9.9 0 0 1 1.2.3l.9 1.5a.9.9 0 0 1-.3 1.2l-1.1.7a7.6 7.6 0 0 1 0 2l1.1.7a.9.9 0 0 1 .3 1.2l-.9 1.5a.9.9 0 0 1-1.2.3l-1.2-.7a6.8 6.8 0 0 1-1.8.8l-.2 1.4a.9.9 0 0 1-1.8 0l-.2-1.4a6.8 6.8 0 0 1-1.8-.8l-1.2.7a.9.9 0 0 1-1.2-.3l-.9-1.5a.9.9 0 0 1 .3-1.2l1.1-.7a7.6 7.6 0 0 1 0-2l-1.1-.7a.9.9 0 0 1-.3-1.2l.9-1.5a.9.9 0 0 1 1.2-.3l1.2.7a6.8 6.8 0 0 1 1.8-.8l.2-1.4Zm1 4.9a2.9 2.9 0 1 0 0 5.8 2.9 2.9 0 0 0 0-5.8Z"
-              />
-            </svg>
-            <span class="sr-only">打开设置</span>
-          </button>
         </div>
       </header>
 
@@ -1760,6 +1706,8 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  /* Leave room for shell-level fixed icons at top-right to avoid text overlap. */
+  padding-right: 104px;
 }
 
 .eyebrow {
@@ -1783,38 +1731,6 @@ h2 {
   color: var(--theme-text-secondary);
   font-size: 13px;
   font-weight: 600;
-}
-
-.head-action-icon {
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--theme-accent-primary-button-border);
-  background: var(--theme-surface-ghost-button-background);
-  color: var(--theme-text-primary);
-  border-radius: 999px;
-  padding: 0;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.head-action-icon svg {
-  width: 16px;
-  height: 16px;
-  fill: currentColor;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }
 
 .error-banner {
@@ -2585,6 +2501,7 @@ h2 {
   .content-head-actions {
     width: 100%;
     justify-content: space-between;
+    padding-right: 64px;
   }
 
   .editor-head {

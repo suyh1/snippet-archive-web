@@ -39,6 +39,8 @@ function isActive(path: string) {
   return route.path === path
 }
 
+const isSettingsRoute = computed(() => route.path === '/settings')
+
 function buildQuickCaptureNameSeed() {
   return `quick-capture-${Date.now().toString(36).slice(-5)}`
 }
@@ -204,6 +206,10 @@ async function submitQuickCapture() {
   }
 }
 
+function navigateToWorkspace() {
+  void router.push('/workspace')
+}
+
 function handleGlobalQuickCaptureShortcut(event: KeyboardEvent) {
   if (event.key === 'Escape') {
     if (quickCaptureOpen.value) {
@@ -295,8 +301,22 @@ onBeforeUnmount(() => {
       ref="topActionsRef"
       class="route-shell-top-actions"
     >
+      <button
+        v-if="isSettingsRoute"
+        type="button"
+        class="route-shell-icon-action"
+        data-testid="back-to-workspace"
+        aria-label="返回工作台"
+        title="返回工作台"
+        @click="navigateToWorkspace"
+      >
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M7.8 4.6a.9.9 0 0 1 1.3 1.2L5.8 9.1h9.3a.9.9 0 1 1 0 1.8H5.8l3.3 3.3a.9.9 0 0 1-1.3 1.2L3 10.6a.9.9 0 0 1 0-1.2l4.8-4.8Z" />
+        </svg>
+      </button>
       <RouterLink
-        data-testid="nav-settings"
+        v-else
+        data-testid="open-settings"
         class="route-shell-icon-action"
         :class="{ active: isActive('/settings') }"
         to="/settings"
@@ -309,7 +329,6 @@ onBeforeUnmount(() => {
           />
         </svg>
       </RouterLink>
-
       <button
         type="button"
         class="route-shell-icon-action primary"
@@ -547,14 +566,16 @@ onBeforeUnmount(() => {
 .route-shell-top-actions {
   position: fixed;
   top: 12px;
-  right: 64px;
+  right: 18px;
   z-index: 25;
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-height: 36px;
 }
 
 .route-shell-icon-action {
+  box-sizing: border-box;
   width: 36px;
   height: 36px;
   border: 1px solid var(--theme-surface-statusbar-border);
@@ -568,6 +589,9 @@ onBeforeUnmount(() => {
   cursor: pointer;
   text-decoration: none;
   padding: 0;
+  line-height: 1;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .route-shell-icon-action svg {
@@ -728,7 +752,7 @@ onBeforeUnmount(() => {
   }
 
   .route-shell-top-actions {
-    right: 52px;
+    right: 12px;
     top: 10px;
   }
 }

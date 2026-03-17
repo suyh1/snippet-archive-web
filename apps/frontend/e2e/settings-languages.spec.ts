@@ -44,12 +44,168 @@ async function readSettingsLayoutMetrics(page: Parameters<typeof test>[0]['page'
   })
 }
 
+type TopRightActionLabel = '打开设置' | '返回工作台'
+
+type TopRightGeometryMetrics = {
+  actionIntersectsMeta: boolean
+  toolbarIntersectsMeta: boolean
+  iconCenterYDelta: number
+  topInset: number
+  rightInset: number
+  metaToIconGroupGap: number
+}
+
+async function readTopRightGeometryMetrics(
+  page: Parameters<typeof test>[0]['page'],
+  actionLabel: TopRightActionLabel,
+) {
+  return page.evaluate((expectedActionLabel) => {
+    const topActions = document.querySelector('.route-shell-top-actions') as HTMLElement | null
+    const meta = document.querySelector('.content-head .meta') as HTMLElement | null
+    const actionEntry = document.querySelector(
+      `[aria-label="${expectedActionLabel}"]`,
+    ) as HTMLElement | null
+    const toolbarEntry = document.querySelector('[data-testid="toolbar-toggle"]') as HTMLElement | null
+    if (!topActions || !meta || !actionEntry || !toolbarEntry) {
+      return null
+    }
+
+    const intersects = (a: DOMRect, b: DOMRect) =>
+      a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
+
+    const topActionsRect = topActions.getBoundingClientRect()
+    const metaRect = meta.getBoundingClientRect()
+    const actionRect = actionEntry.getBoundingClientRect()
+    const toolbarRect = toolbarEntry.getBoundingClientRect()
+
+    return {
+      actionIntersectsMeta: intersects(metaRect, actionRect),
+      toolbarIntersectsMeta: intersects(metaRect, toolbarRect),
+      iconCenterYDelta: Math.abs(
+        actionRect.top + actionRect.height / 2 - (toolbarRect.top + toolbarRect.height / 2),
+      ),
+      topInset: topActionsRect.top,
+      rightInset: window.innerWidth - topActionsRect.right,
+      metaToIconGroupGap: topActionsRect.left - metaRect.right,
+    }
+  }, actionLabel)
+}
+
+function expectTopRightGeometry(metrics: TopRightGeometryMetrics | null) {
+  expect(metrics).not.toBeNull()
+  expect(metrics?.actionIntersectsMeta).toBe(false)
+  expect(metrics?.toolbarIntersectsMeta).toBe(false)
+  expect(metrics?.iconCenterYDelta).toBeLessThanOrEqual(2)
+  expect(metrics?.topInset).toBeGreaterThanOrEqual(8)
+  expect(metrics?.rightInset).toBeGreaterThanOrEqual(8)
+  expect(metrics?.metaToIconGroupGap).toBeGreaterThanOrEqual(8)
+}
+
+test('top-right icon group keeps one-row geometry across routes and breakpoints', async ({ page }) => {
+  const viewports = [
+    { width: 2048, height: 526 },
+    { width: 900, height: 760 },
+  ]
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport)
+    await page.goto('/')
+
+    await expect(page.getByLabel('打开设置')).toHaveCount(1)
+    await expect(page.getByLabel('返回工作台')).toHaveCount(0)
+    const workspaceMetrics = await readTopRightGeometryMetrics(page, '打开设置')
+    expectTopRightGeometry(workspaceMetrics)
+
+    await page.getByTestId('open-settings').click()
+    await expect(page).toHaveURL(/\/settings(?:\?.*)?$/)
+    await expect(page.getByLabel('打开设置')).toHaveCount(0)
+    await expect(page.getByLabel('返回工作台')).toHaveCount(1)
+    const settingsMetrics = await readTopRightGeometryMetrics(page, '返回工作台')
+    expectTopRightGeometry(settingsMetrics)
+  }
+})
+
 test('settings page shows language list and supports tab switching', async ({ page }) => {
   await page.goto('/')
+
+  await expect(page.getByLabel('打开设置')).toHaveCount(1)
+  const topRightLayout = await page.evaluate(() => {
+    const meta = document.querySelector('.content-head .meta') as HTMLElement | null
+    const settingsEntry = document.querySelector('[aria-label="打开设置"]') as HTMLElement | null
+    const toolbarEntry = document.querySelector('[data-testid="toolbar-toggle"]') as HTMLElement | null
+    if (!meta || !settingsEntry || !toolbarEntry) {
+      return null
+    }
+
+    const metaRect = meta.getBoundingClientRect()
+    const settingsRect = settingsEntry.getBoundingClientRect()
+    const toolbarRect = toolbarEntry.getBoundingClientRect()
+    const intersects =
+      metaRect.left < settingsRect.right &&
+      metaRect.right > settingsRect.left &&
+      metaRect.top < settingsRect.bottom &&
+      metaRect.bottom > settingsRect.top
+    const toolbarIntersects =
+      metaRect.left < toolbarRect.right &&
+      metaRect.right > toolbarRect.left &&
+      metaRect.top < toolbarRect.bottom &&
+      metaRect.bottom > toolbarRect.top
+    const iconCenterYDelta = Math.abs(
+      settingsRect.top + settingsRect.height / 2 - (toolbarRect.top + toolbarRect.height / 2),
+    )
+
+    return {
+      intersects,
+      toolbarIntersects,
+      iconCenterYDelta,
+    }
+  })
+  expect(topRightLayout).not.toBeNull()
+  expect(topRightLayout?.intersects).toBe(false)
+  expect(topRightLayout?.toolbarIntersects).toBe(false)
+  expect(topRightLayout?.iconCenterYDelta).toBeLessThanOrEqual(2)
 
   await page.getByTestId('open-settings').click()
   await expect(page).toHaveURL(/\/settings(?:\?.*)?$/)
   await expect(page.getByTestId('settings-view')).toBeVisible()
+  await expect(page.getByLabel('打开设置')).toHaveCount(0)
+  await expect(page.getByLabel('返回工作台')).toHaveCount(1)
+
+  const settingsTopRightLayout = await page.evaluate(() => {
+    const meta = document.querySelector('.content-head .meta') as HTMLElement | null
+    const backEntry = document.querySelector('[aria-label="返回工作台"]') as HTMLElement | null
+    const toolbarEntry = document.querySelector('[data-testid="toolbar-toggle"]') as HTMLElement | null
+    if (!meta || !backEntry || !toolbarEntry) {
+      return null
+    }
+
+    const metaRect = meta.getBoundingClientRect()
+    const backRect = backEntry.getBoundingClientRect()
+    const toolbarRect = toolbarEntry.getBoundingClientRect()
+    const backIntersects =
+      metaRect.left < backRect.right &&
+      metaRect.right > backRect.left &&
+      metaRect.top < backRect.bottom &&
+      metaRect.bottom > backRect.top
+    const toolbarIntersects =
+      metaRect.left < toolbarRect.right &&
+      metaRect.right > toolbarRect.left &&
+      metaRect.top < toolbarRect.bottom &&
+      metaRect.bottom > toolbarRect.top
+    const iconCenterYDelta = Math.abs(
+      backRect.top + backRect.height / 2 - (toolbarRect.top + toolbarRect.height / 2),
+    )
+
+    return {
+      backIntersects,
+      toolbarIntersects,
+      iconCenterYDelta,
+    }
+  })
+  expect(settingsTopRightLayout).not.toBeNull()
+  expect(settingsTopRightLayout?.backIntersects).toBe(false)
+  expect(settingsTopRightLayout?.toolbarIntersects).toBe(false)
+  expect(settingsTopRightLayout?.iconCenterYDelta).toBeLessThanOrEqual(2)
 
   await expect(page.getByTestId('settings-panel-languages')).toBeVisible()
   const languageCount = await page.getByTestId('settings-language-item').count()
