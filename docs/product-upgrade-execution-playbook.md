@@ -102,6 +102,8 @@
 
 ## 2.2 阶段二（4-8 周）：团队协作升级
 
+当前状态：✅ 已完成（线程 F/G/H 全部验收通过）。
+
 ### 目标
 
 把“个人工具”升级为“可团队治理的片段知识库”。
@@ -255,11 +257,11 @@
 4. 线程 D：revision 前端面板 + 回滚（✅ 已完成）。
 5. 线程 E：前端路由与 store 解耦（✅ 已完成）。
 6. 阶段一收口：Quick Capture + revision diff + 搜索性能验收（✅ 已完成）。
-6. 线程 F：账号与组织基础（未开始）。
-7. 线程 G：权限与分享链接（未开始）。
-8. 线程 H：审计日志与管理页面（未开始）。
-9. 线程 I：VS Code 插件 PoC（未开始）。
-10. 线程 J：CLI + 导入导出协议（未开始）。
+7. 线程 F：账号与组织基础（✅ 已完成）。
+8. 线程 G：权限与分享链接（✅ 已完成）。
+9. 线程 H：审计日志与管理页面（✅ 已完成）。
+10. 线程 I：VS Code 插件 PoC（未开始）。
+11. 线程 J：CLI + 导入导出协议（未开始）。
 
 ## 6. 里程碑与指标
 
@@ -514,6 +516,48 @@ A6 完成标记：
    - `npm run typecheck --workspace @snippet-archive/frontend`
    - `npm run build`
 
+### 2026-03-17｜线程 F（完成）
+
+1. 目标：完成“账号体系 + 组织基础 + 成员管理基础 UI”，为阶段二后续权限与审计能力提供底座。
+2. 结果：
+   - 数据层：新增 `User`、`Session`、`Organization`、`Membership` 及 `Workspace.organizationId/ownerId` 关联。
+   - 后端：新增 `auth` 与 `organization` 模块（注册/登录/会话、组织创建、成员列表与邀请）。
+   - 前端：新增 `/team` 页面，支持注册/登录、组织切换、成员管理基础交互。
+   - 回归：新增 `auth-organization.e2e-spec.ts` 与 `TeamPage.spec.ts`。
+3. 验证命令（均通过）：
+   - `npm run test:e2e --workspace @snippet-archive/backend -- auth-organization.e2e-spec.ts`
+   - `npm run test:run --workspace @snippet-archive/frontend -- src/pages/TeamPage.spec.ts`
+
+### 2026-03-17｜线程 G（完成）
+
+1. 目标：完成“资源权限矩阵 + 分享链接模型 + 分享管理 UI”，实现团队协作中的可控访问链路。
+2. 结果：
+   - 后端：新增 `permission` 与 `share` 模块；`workspace/search/favorites` 接入组织可见性与角色权限校验。
+   - 分享能力：支持 `PRIVATE/TEAM/PUBLIC` 三类可见性，支持过期与撤销。
+   - 前端：团队页新增分享管理区域，支持创建/查看/撤销分享链接。
+   - 回归：新增 `permissions-share.e2e-spec.ts` 与 `team-collaboration.spec.ts`（覆盖 click/keyboard/focus-blur/state）。
+3. 验证命令（均通过）：
+   - `npm run test:e2e --workspace @snippet-archive/backend -- permissions-share.e2e-spec.ts`
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend -- e2e/team-collaboration.spec.ts`
+
+### 2026-03-17｜线程 H（完成）
+
+1. 目标：完成“审计日志模型 + 管理查询 API + 前端审计查看”，闭环阶段二治理能力。
+2. 结果：
+   - 数据层：新增 `AuditLog` 模型，核心写操作统一记录审计事件。
+   - 后端：新增审计查询接口（按组织、用户、操作、时间过滤），仅 Owner 可访问。
+   - 前端：团队页新增审计查询区域，支持 action 过滤与列表展示。
+   - 错误语义：前端统一区分 `UNAUTHORIZED/FORBIDDEN/NOT_FOUND/GONE`。
+   - 回归：新增 `audit-logs.e2e-spec.ts`，覆盖未授权/越权/过期链接安全场景。
+3. 验证命令（均通过）：
+   - `npm run test:e2e --workspace @snippet-archive/backend -- audit-logs.e2e-spec.ts`
+   - `npm run test --workspace @snippet-archive/backend`
+   - `npm run test:e2e --workspace @snippet-archive/backend`
+   - `npm run test:run --workspace @snippet-archive/frontend`
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
+   - `npm run typecheck --workspace @snippet-archive/frontend`
+   - `npm run build`
+
 ## 12. 阶段一执行细化（线程 B：标签与收藏）
 
 ### 12.1 线程目标
@@ -716,3 +760,228 @@ S5 完成标记：
 
 1. 当前状态：✅ 已完成（阶段一收口全部验收通过）。
 2. 当前阻塞：无。
+
+## 17. 阶段二执行细化（线程 F：账号与组织基础）
+
+### 17.1 线程目标
+
+1. 建立账号体系（注册/登录/会话）并提供 `me/logout` 基础能力。
+2. 建立组织与成员模型（Owner/Editor/Viewer）并支持组织创建与成员管理。
+3. 将工作区升级为“可归属组织”的资源模型（`organizationId` + `ownerId`）。
+
+### 17.2 线程 F 小功能点清单（逐项打标）
+
+F0 文档与状态：
+- [x] F0-1：线程总览将线程 F 标记为“进行中”。
+- [x] F0-2：在主执行文档追加线程 F 细化清单与执行记录。
+
+F1 数据模型：
+- [x] F1-1：新增 `User`、`Session`、`Organization`、`Membership` 模型与索引。
+- [x] F1-2：`Workspace` 新增 `organizationId`、`ownerId`。
+- [x] F1-3：同步 Prisma client 生成与数据库结构推送。
+
+F2 后端账号与组织接口：
+- [x] F2-1：新增 `POST /api/auth/register`、`POST /api/auth/login`、`GET /api/auth/me`、`POST /api/auth/logout`。
+- [x] F2-2：新增 `GET /api/organizations`、`POST /api/organizations`、`GET /api/organizations/:id/members`、`POST /api/organizations/:id/members`。
+- [x] F2-3：组织成员管理默认 Owner 权限收敛（添加/调权/移除）。
+
+F3 前端基础协作入口：
+- [x] F3-1：新增 `/team` 路由与团队协作页面。
+- [x] F3-2：支持注册/登录、组织创建与成员添加交互。
+- [x] F3-3：团队入口接入壳层导航（工具栏）。
+
+F4 测试与门禁：
+- [x] F4-1：新增回归 `apps/backend/test/auth-organization.e2e-spec.ts`（先红后绿）。
+- [x] F4-2：新增回归 `apps/frontend/src/pages/TeamPage.spec.ts`（先红后绿）。
+- [x] F4-3：targeted + full gate 通过。
+
+F5 完成标记：
+- [x] F5-1：线程总览将“线程 F”标记为已完成。
+- [x] F5-2：追加线程 F 执行记录与命令证据。
+
+### 17.3 当前状态
+
+1. 当前状态：✅ 已完成（线程 F 全部验收通过）。
+2. 当前阻塞：无。
+
+## 18. 阶段二执行细化（线程 G：权限与分享链接）
+
+### 18.1 线程目标
+
+1. 建立组织角色权限矩阵并接入核心资源操作。
+2. 建立分享链接模型（私有/团队/公开只读）与撤销/过期治理。
+3. 前端提供可操作的分享管理 UI。
+
+### 18.2 线程 G 小功能点清单（逐项打标）
+
+G0 文档与状态：
+- [x] G0-1：线程总览将线程 G 标记为“进行中”。
+- [x] G0-2：在主执行文档追加线程 G 细化清单与执行记录。
+
+G1 权限中间层：
+- [x] G1-1：新增 `permission` 服务并实现 Owner/Editor/Viewer 角色校验。
+- [x] G1-2：`workspace` 写操作接入权限校验。
+- [x] G1-3：`search/favorites` 接入组织可见性过滤，避免越权读取。
+
+G2 分享能力：
+- [x] G2-1：新增 `ShareLink` 模型与 token、过期、撤销字段。
+- [x] G2-2：新增文件级分享管理接口（创建/查询/撤销）。
+- [x] G2-3：新增公开访问接口 `GET /api/share-links/:token`，按可见性执行权限判断。
+
+G3 前端分享管理：
+- [x] G3-1：团队页支持输入 `workspaceId/fileId` 创建分享链接。
+- [x] G3-2：支持列表展示与撤销操作。
+- [x] G3-3：覆盖 Enter 快捷提交与失焦标准化（focus/blur）行为。
+
+G4 安全回归：
+- [x] G4-1：新增 `apps/backend/test/permissions-share.e2e-spec.ts`（未授权/越权/过期场景先红后绿）。
+- [x] G4-2：新增 `apps/frontend/e2e/team-collaboration.spec.ts`，覆盖分享创建链路。
+
+G5 完成标记：
+- [x] G5-1：线程总览将“线程 G”标记为已完成。
+- [x] G5-2：追加线程 G 执行记录与命令证据。
+
+### 18.3 当前状态
+
+1. 当前状态：✅ 已完成（线程 G 全部验收通过）。
+2. 当前阻塞：无。
+
+## 19. 阶段二执行细化（线程 H：审计日志与管理页面）
+
+### 19.1 线程目标
+
+1. 建立审计日志模型并覆盖核心写操作事件落库。
+2. 提供管理端查询能力（按时间、用户、操作类型过滤）。
+3. 在前端协作页提供审计日志查询视图。
+
+### 19.2 线程 H 小功能点清单（逐项打标）
+
+H0 文档与状态：
+- [x] H0-1：线程总览将线程 H 标记为“进行中”。
+- [x] H0-2：在主执行文档追加线程 H 细化清单与执行记录。
+
+H1 审计模型与服务：
+- [x] H1-1：新增 `AuditLog` 模型与索引。
+- [x] H1-2：新增 `audit` 模块与统一记录服务。
+- [x] H1-3：工作区、分享、组织成员写操作接入审计记录。
+
+H2 管理查询接口：
+- [x] H2-1：新增 `GET /api/organizations/:organizationId/audit-logs`。
+- [x] H2-2：支持 `action/actorId/from/to/page/pageSize` 过滤参数。
+- [x] H2-3：接口访问权限限制为组织 Owner。
+
+H3 前端审计页面能力：
+- [x] H3-1：团队页新增审计查询输入与结果列表。
+- [x] H3-2：支持按 action 过滤并回显查询结果。
+- [x] H3-3：错误提示显式区分 `UNAUTHORIZED/FORBIDDEN/NOT_FOUND/GONE`。
+
+H4 回归与门禁：
+- [x] H4-1：新增 `apps/backend/test/audit-logs.e2e-spec.ts`（先红后绿）。
+- [x] H4-2：通过 full gate（backend/frontend test + e2e + typecheck + build）。
+
+H5 完成标记：
+- [x] H5-1：线程总览将“线程 H”标记为已完成。
+- [x] H5-2：追加线程 H 执行记录与命令证据。
+
+### 19.3 当前状态
+
+1. 当前状态：✅ 已完成（线程 H 全部验收通过）。
+2. 当前阻塞：无。
+
+## 20. 阶段二执行细化（线程 F/G/H 加固：登录入口与鉴权收敛）
+
+### 20.1 线程目标
+
+1. 将前端项目入口收敛为登录页，未鉴权用户不可直接访问业务页面。
+2. 保证登录后仅能访问当前用户可见的数据范围（个人工作区按 owner 隔离，组织数据按成员关系隔离）。
+3. 工具栏仅作为快捷入口，提供可持续可见的常规页面导航入口。
+
+### 20.2 线程小功能点清单（逐项打标）
+
+Z0 入口与登录页：
+- [x] Z0-1：新增 `/login` 路由并将 `/` 默认入口重定向到登录页。
+- [x] Z0-2：新增 `LoginPage`，补齐登录/注册交互与回跳能力。
+- [x] Z0-3：登录页补齐 keyboard 行为（密码框 `Enter` 提交）与校验反馈。
+
+Z1 路由鉴权与导航：
+- [x] Z1-1：路由守卫接入 `auth/me` 会话校验，未登录统一重定向 `/login?redirect=...`。
+- [x] Z1-2：Shell 增加常规主导航（工作区/搜索/收藏/团队/设置），不再依赖工具栏作为唯一入口。
+- [x] Z1-3：工具栏保留快捷定位属性（默认隐藏、快捷键/图标唤出）。
+
+Z2 后端权限收敛：
+- [x] Z2-1：`workspaces/search/favorites` 统一改为必需鉴权守卫。
+- [x] Z2-2：个人工作区可见性收敛为 `ownerId=当前用户`；组织空间按成员组织过滤。
+- [x] Z2-3：`WorkspaceService` 单测与 e2e 同步到“带 actor 上下文”的新权限模型。
+
+Z3 回归与门禁：
+- [x] Z3-1：新增前端回归 `apps/frontend/src/pages/LoginPage.spec.ts`（先红后绿）。
+- [x] Z3-2：新增前端 e2e 回归 `apps/frontend/e2e/auth-entry-navigation.spec.ts`（先红后绿）。
+- [x] Z3-3：新增后端未鉴权回归断言（`workspace/search/favorites`）并通过 full gate。
+
+Z4 布局一致性与导航几何收口：
+- [x] Z4-1：修复主导航与页面内容重叠，补“左上导航与页面头部不重叠”几何回归（工作区 + 团队页，含断点覆盖）。
+- [x] Z4-2：团队页容器与收藏页对齐（宽度、内边距、居中策略、滚动容器）并补稀疏/稠密几何断言。
+- [x] Z4-3：保持既有高优先几何门禁（`files-panel-progressive-reveal`、`settings-languages`）稳定通过。
+
+Z5 全局会话出口收口：
+- [x] Z5-1：在壳层右上角新增全局“退出登录”入口，不再依赖团队页内局部出口。
+- [x] Z5-2：退出后清理本地 token 并回到 `/login`，访问业务页会按守卫重定向。
+- [x] Z5-3：新增 e2e 回归覆盖全局退出链路（点击退出 -> 登录页 -> token 清空 -> 受保护路由拦截）。
+
+### 20.3 当前状态
+
+1. 当前状态：✅ 已完成（阶段二登录与鉴权收敛加固已验收通过）。
+2. 当前阻塞：无。
+
+### 2026-03-18｜线程 F/G/H 加固（登录入口与鉴权收敛）
+
+1. 目标：落实阶段二“账号与权限治理”的收口要求，修复入口未登录直达、路由未鉴权、工具栏承担主导航等问题。
+2. 结果：
+   - 前端：新增登录页与路由守卫，`/` 入口统一到 `/login`，业务路由需通过会话校验后访问。
+   - 导航：新增常规主导航并保留工具栏快捷属性，页面间跳转不再依赖浮动工具栏。
+   - 后端：`workspaces/search/favorites` 切换为必需鉴权，个人数据按 `ownerId` 隔离，避免跨用户可见。
+   - 测试：新增登录回归与入口鉴权 e2e，现有 e2e 基座接入鉴权 fixture，阶段二回归链路完整通过。
+3. 验证命令（均通过）：
+   - `npm run test:run --workspace @snippet-archive/frontend`
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
+   - `npm run test --workspace @snippet-archive/backend`
+   - `npm run test:e2e --workspace @snippet-archive/backend`
+   - `npm run typecheck --workspace @snippet-archive/frontend`
+   - `npm run build`
+
+### 2026-03-18｜线程 F/G/H 加固后续（导航安全区 + 团队页版式一致性）
+
+1. 目标：修复左上主导航与页面内容重叠、统一团队页与其他页面版式，并按 `TESTING.md` 落实几何断言回归。
+2. 结果：
+   - 导航安全区：`ShellApp` 引入动态顶部安全区变量（基于主导航/右上操作组实时计算），并将偏移应用到各路由页面根容器，避免固定导航遮挡业务内容。
+   - 团队页统一：`TeamPage` 对齐 `Favorites/Search` 的容器基线（宽度、居中、内边距、卡片样式、滚动策略），消除版式差异。
+   - 回归补齐：新增并通过以下 e2e 断言
+     - `auth-entry-navigation`：主导航与 `workspace sidebar/team header` 不重叠（含 2048 与 900 宽度断点）。
+     - `team-collaboration`：团队页与收藏页容器基线一致；团队页壳层几何（稀疏/稠密）持续满足视口约束。
+   - 稳定性回归：`files-panel-progressive-reveal` 与 `settings-languages` 既有几何门禁在新布局下保持通过。
+3. 验证命令（均通过）：
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend -- e2e/auth-entry-navigation.spec.ts e2e/team-collaboration.spec.ts`（先红后绿）
+   - `npm run test:run --workspace @snippet-archive/frontend -- src/ShellApp.quick-capture.spec.ts src/pages/TeamPage.spec.ts`
+   - `npm run test:run --workspace @snippet-archive/frontend`
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
+   - `npm run typecheck --workspace @snippet-archive/frontend`
+   - `npm run check:theme-contract --workspace @snippet-archive/frontend`
+   - `npm run test --workspace @snippet-archive/backend`
+   - `npm run test:e2e --workspace @snippet-archive/backend`
+   - `npm run build`
+
+### 2026-03-18｜线程 F/G/H 加固后续（全局退出登录入口）
+
+1. 目标：提供全局可见的退出登录入口，避免“仅团队页可退出”的路径隐蔽问题。
+2. 结果：
+   - 壳层能力：`ShellApp` 右上角新增全局退出按钮（非登录页显示），调用 `/auth/logout` 后统一清理 token 并跳转 `/login`。
+   - 交互一致性：调整 `App.vue` 头部右侧预留空间，确保“设置/返回 + 退出 + 工具栏”在断点下仍满足不重叠几何约束。
+   - 回归补齐：`auth-entry-navigation` 新增“全局退出链路”用例并先红后绿通过。
+3. 验证命令（均通过）：
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend -- e2e/auth-entry-navigation.spec.ts -g "authenticated user can logout from global top actions and is redirected to login"`（先红后绿）
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend -- e2e/settings-languages.spec.ts -g "top-right icon group keeps one-row geometry across routes and breakpoints"`
+   - `npm run test:run --workspace @snippet-archive/frontend -- src/ShellApp.quick-capture.spec.ts`
+   - `npm run test:run --workspace @snippet-archive/frontend`
+   - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
+   - `npm run typecheck --workspace @snippet-archive/frontend`
+   - `npm run build --workspace @snippet-archive/frontend`
