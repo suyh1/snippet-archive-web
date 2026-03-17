@@ -19,4 +19,21 @@ describe('Swagger (e2e)', () => {
     expect(res.status).toBe(200)
     expect(res.text).toContain('Swagger UI')
   })
+
+  it('GET /docs/json should expose stage-2 API paths', async () => {
+    const res = await request(app.getHttpServer()).get('/docs/json')
+
+    expect(res.status).toBe(200)
+    expect(res.body?.openapi).toBe('3.0.3')
+
+    const paths = res.body?.paths as Record<string, unknown>
+    expect(paths).toBeDefined()
+
+    expect(paths['/api/auth/login']).toBeDefined()
+    expect(paths['/api/auth/me']).toBeDefined()
+    expect(paths['/api/organizations']).toBeDefined()
+    expect(paths['/api/organizations/{organizationId}/audit-logs']).toBeDefined()
+    expect(paths['/api/workspaces/{workspaceId}/files/{fileId}/share-links']).toBeDefined()
+    expect(paths['/api/share-links/{token}']).toBeDefined()
+  })
 })
