@@ -155,4 +155,174 @@ describe('Auth & organization API (e2e)', () => {
     expect(viewerCreateWorkspace.status).toBe(403)
     expect(viewerCreateWorkspace.body.error.code).toBe('FORBIDDEN')
   })
+
+  it('protects owner membership and rejects non-owner member management', async () => {
+    const owner = await registerAccount(app, uniqueEmail('owner-mgmt'), 'Owner Mgmt')
+    const editor = await registerAccount(app, uniqueEmail('editor-mgmt'), 'Editor Mgmt')
+    const viewer = await registerAccount(app, uniqueEmail('viewer-mgmt'), 'Viewer Mgmt')
+
+    const createOrgRes = await request(app.getHttpServer())
+      .post('/api/organizations')
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send({
+        name: 'Member Mgmt Org',
+        slug: `member-mgmt-org-${Date.now()}`,
+      })
+
+    expect(createOrgRes.status).toBe(201)
+    const orgId = createOrgRes.body.data.id as string
+
+    const inviteEditorRes = await request(app.getHttpServer())
+      .post(`/api/organizations/${orgId}/members`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send({
+        email: editor.email,
+        role: 'EDITOR',
+      })
+
+    expect(inviteEditorRes.status).toBe(201)
+    const editorMembershipId = inviteEditorRes.body.data.id as string
+
+    const inviteViewerRes = await request(app.getHttpServer())
+      .post(`/api/organizations/${orgId}/members`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send({
+        email: viewer.email,
+        role: 'VIEWER',
+      })
+
+    expect(inviteViewerRes.status).toBe(201)
+    const viewerMembershipId = inviteViewerRes.body.data.id as string
+
+    const listMembersRes = await request(app.getHttpServer())
+      .get(`/api/organizations/${orgId}/members`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+
+    expect(listMembersRes.status).toBe(200)
+
+    const ownerMembership = (listMembersRes.body.data.items as Array<{ id: string; userId: string }>).find(
+      (item) => item.userId === owner.userId,
+    )
+
+    expect(ownerMembership?.id).toBeTruthy()
+
+    const viewerUpdateEditorRes = await request(app.getHttpServer())
+      .patch(`/api/organizations/${orgId}/members/${editorMembershipId}`)
+      .set('Authorization', `Bearer ${viewer.accessToken}`)
+      .send({
+        role: 'VIEWER',
+      })
+
+    expect(viewerUpdateEditorRes.status).toBe(403)
+    expect(viewerUpdateEditorRes.body.error.code).toBe('FORBIDDEN')
+
+    const editorRemoveViewerRes = await request(app.getHttpServer())
+      .delete(`/api/organizations/${orgId}/members/${viewerMembershipId}`)
+      .set('Authorization', `Bearer ${editor.accessToken}`)
+
+    expect(editorRemoveViewerRes.status).toBe(403)
+    expect(editorRemoveViewerRes.body.error.code).toBe('FORBIDDEN')
+
+    const ownerDowngradeSelfRes = await request(app.getHttpServer())
+      .patch(`/api/organizations/${orgId}/members/${ownerMembership!.id}`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send({
+        role: 'EDITOR',
+      })
+
+    expect(ownerDowngradeSelfRes.status).toBe(409)
+    expect(ownerDowngradeSelfRes.body.error.code).toBe('CONFLICT')
+
+    const ownerRemoveSelfRes = await request(app.getHttpServer())
+      .delete(`/api/organizations/${orgId}/members/${ownerMembership!.id}`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+
+    expect(ownerRemoveSelfRes.status).toBe(409)
+    expect(ownerRemoveSelfRes.body.error.code).toBe('CONFLICT')
+
+    const ownerUpgradeViewerRes = await request(app.getHttpServer())
+      .patch(`/api/organizations/${orgId}/members/${viewerMembershipId}`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send({
+        role: 'EDITOR',
+      })
+
+    expect(ownerUpgradeViewerRes.status).toBe(200)
+    expect(ownerUpgradeViewerRes.body.data.role).toBe('EDITOR')
+
+    const ownerRemoveViewerRes = await request(app.getHttpServer())
+      .delete(`/api/organizations/${orgId}/members/${viewerMembershipId}`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+
+    expect(ownerRemoveViewerRes.status).toBe(200)
+    expect(ownerRemoveViewerRes.body.data.id).toBe(viewerMembershipId)
+  })
+
+  it('allows owner to delete organization and rejects non-owner deletion', async () => {
+    const owner = await registerAccount(app, uniqueEmail('owner-org-delete'), 'Owner Org Delete')
+    const viewer = await registerAccount(app, uniqueEmail('viewer-org-delete'), 'Viewer Org Delete')
+
+    const createOrgRes = await request(app.getHttpServer())
+      .post('/api/organizations')
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send({
+        name: 'Delete Org',
+        slug: `delete-org-${Date.now()}`,
+      })
+
+    expect(createOrgRes.status).toBe(201)
+    const orgId = createOrgRes.body.data.id as string
+
+    const inviteViewerRes = await request(app.getHttpServer())
+      .post(`/api/organizations/${orgId}/members`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send({
+        email: viewer.email,
+        role: 'VIEWER',
+      })
+
+    expect(inviteViewerRes.status).toBe(201)
+
+    const createWorkspaceRes = await request(app.getHttpServer())
+      .post('/api/workspaces')
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send({
+        title: 'Org Delete Workspace',
+        organizationId: orgId,
+      })
+
+    expect(createWorkspaceRes.status).toBe(201)
+    const workspaceId = createWorkspaceRes.body.data.id as string
+
+    const viewerDeleteRes = await request(app.getHttpServer())
+      .delete(`/api/organizations/${orgId}`)
+      .set('Authorization', `Bearer ${viewer.accessToken}`)
+
+    expect(viewerDeleteRes.status).toBe(403)
+    expect(viewerDeleteRes.body.error.code).toBe('FORBIDDEN')
+
+    const ownerDeleteRes = await request(app.getHttpServer())
+      .delete(`/api/organizations/${orgId}`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+
+    expect(ownerDeleteRes.status).toBe(200)
+    expect(ownerDeleteRes.body.data.id).toBe(orgId)
+
+    const listOwnerOrganizationsRes = await request(app.getHttpServer())
+      .get('/api/organizations')
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+
+    expect(listOwnerOrganizationsRes.status).toBe(200)
+    expect(listOwnerOrganizationsRes.body.data.items).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: orgId })]),
+    )
+
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { id: true, organizationId: true },
+    })
+
+    expect(workspace?.id).toBe(workspaceId)
+    expect(workspace?.organizationId).toBeNull()
+  })
 })

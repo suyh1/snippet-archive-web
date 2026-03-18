@@ -32,8 +32,15 @@ describe('Swagger (e2e)', () => {
     expect(paths['/api/auth/login']).toBeDefined()
     expect(paths['/api/auth/me']).toBeDefined()
     expect(paths['/api/organizations']).toBeDefined()
+    expect(paths['/api/organizations/{organizationId}']).toBeDefined()
     expect(paths['/api/organizations/{organizationId}/audit-logs']).toBeDefined()
     expect(paths['/api/workspaces/{workspaceId}/files/{fileId}/share-links']).toBeDefined()
     expect(paths['/api/share-links/{token}']).toBeDefined()
+
+    const sharePermissionEnum = res.body?.components?.schemas?.ShareLinkPermission?.enum
+    expect(Array.isArray(sharePermissionEnum)).toBe(true)
+    expect(sharePermissionEnum).toEqual(
+      expect.arrayContaining(['READ', 'READ_METADATA']),
+    )
   })
 })

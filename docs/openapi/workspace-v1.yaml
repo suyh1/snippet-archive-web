@@ -132,6 +132,27 @@ paths:
         '409':
           $ref: '#/components/responses/ConflictError'
 
+  /api/organizations/{organizationId}:
+    delete:
+      summary: Delete organization
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+      responses:
+        '200':
+          description: Organization removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteIdResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
   /api/organizations/{organizationId}/members:
     get:
       summary: List organization members
@@ -1255,7 +1276,7 @@ components:
 
     ShareLinkPermission:
       type: string
-      enum: [READ]
+      enum: [READ, READ_METADATA]
 
     ShareLink:
       type: object
@@ -1336,6 +1357,7 @@ components:
           type: string
         content:
           type: string
+          nullable: true
         tags:
           type: array
           items:

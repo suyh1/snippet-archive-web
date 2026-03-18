@@ -108,6 +108,17 @@ export class OrganizationService {
     }
   }
 
+  async deleteOrganization(organizationId: string, currentUserId: string) {
+    await this.permissionService.requireMembership(organizationId, currentUserId, 'OWNER')
+
+    const removed = await this.prisma.organization.delete({
+      where: { id: organizationId },
+      select: { id: true },
+    })
+
+    return removed
+  }
+
   async listMembers(organizationId: string, currentUserId: string) {
     await this.permissionService.requireMembership(organizationId, currentUserId, 'VIEWER')
 

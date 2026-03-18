@@ -217,6 +217,41 @@ describe('Permissions & share links API (e2e)', () => {
     expect(publicAccessRes.status).toBe(200)
     expect(publicAccessRes.body.data.file.id).toBe(fileId)
 
+    const createMetadataRes = await request(app.getHttpServer())
+      .post(`/api/workspaces/${workspaceId}/files/${fileId}/share-links`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send({
+        visibility: 'PUBLIC',
+        permission: 'READ_METADATA',
+      })
+
+    expect(createMetadataRes.status).toBe(201)
+    const metadataShareId = createMetadataRes.body.data.id as string
+    const metadataToken = createMetadataRes.body.data.token as string
+
+    const metadataAccessRes = await request(app.getHttpServer()).get(
+      `/api/share-links/${metadataToken}`,
+    )
+
+    expect(metadataAccessRes.status).toBe(200)
+    expect(metadataAccessRes.body.data.permission).toBe('READ_METADATA')
+    expect(metadataAccessRes.body.data.file.id).toBe(fileId)
+    expect(metadataAccessRes.body.data.file.content).toBeNull()
+
+    const revokeMetadataRes = await request(app.getHttpServer())
+      .post(
+        `/api/workspaces/${workspaceId}/files/${fileId}/share-links/${metadataShareId}/revoke`,
+      )
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+
+    expect(revokeMetadataRes.status).toBe(201)
+
+    const revokedAccessRes = await request(app.getHttpServer()).get(
+      `/api/share-links/${metadataToken}`,
+    )
+
+    expect(revokedAccessRes.status).toBe(410)
+
     const createTeamRes = await request(app.getHttpServer())
       .post(`/api/workspaces/${workspaceId}/files/${fileId}/share-links`)
       .set('Authorization', `Bearer ${owner.accessToken}`)

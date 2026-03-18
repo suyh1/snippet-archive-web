@@ -154,6 +154,50 @@ describe('Audit logs API (e2e)', () => {
       ]),
     )
 
+    const targetLog = ownerAuditRes.body.data.items.find((item: { action: string }) => {
+      return item.action === 'WORKSPACE_FILE_UPDATED'
+    }) as { createdAt: string } | undefined
+    expect(targetLog).toBeDefined()
+
+    const targetCreatedAt = new Date(targetLog!.createdAt)
+    const fromIso = new Date(targetCreatedAt.getTime() - 60_000).toISOString()
+    const toIso = new Date(targetCreatedAt.getTime() + 60_000).toISOString()
+
+    const comboFilterRes = await request(app.getHttpServer())
+      .get(`/api/organizations/${orgId}/audit-logs`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .query({
+        action: 'WORKSPACE_FILE_UPDATED',
+        actorId: owner.userId,
+        from: fromIso,
+        to: toIso,
+      })
+
+    expect(comboFilterRes.status).toBe(200)
+    expect(comboFilterRes.body.data.items.length).toBeGreaterThanOrEqual(1)
+    expect(comboFilterRes.body.data.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'WORKSPACE_FILE_UPDATED',
+          actorId: owner.userId,
+        }),
+      ]),
+    )
+
+    const emptyComboFilterRes = await request(app.getHttpServer())
+      .get(`/api/organizations/${orgId}/audit-logs`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .query({
+        action: 'WORKSPACE_FILE_UPDATED',
+        actorId: viewer.userId,
+        from: fromIso,
+        to: toIso,
+      })
+
+    expect(emptyComboFilterRes.status).toBe(200)
+    expect(emptyComboFilterRes.body.data.items).toEqual([])
+    expect(emptyComboFilterRes.body.data.total).toBe(0)
+
     const viewerAuditRes = await request(app.getHttpServer())
       .get(`/api/organizations/${orgId}/audit-logs`)
       .set('Authorization', `Bearer ${viewer.accessToken}`)

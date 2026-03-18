@@ -46,6 +46,19 @@ export class OrganizationController {
     return { data: organization }
   }
 
+  @Delete(':organizationId')
+  async deleteOrganization(
+    @CurrentUser() currentUser: AuthUser | null,
+    @Param('organizationId', new ParseUUIDPipe()) organizationId: string,
+  ) {
+    const removed = await this.organizationService.deleteOrganization(
+      organizationId,
+      currentUser!.id,
+    )
+
+    return { data: removed }
+  }
+
   @Get(':organizationId/members')
   async listMembers(
     @CurrentUser() currentUser: AuthUser | null,

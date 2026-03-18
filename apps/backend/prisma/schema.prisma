@@ -21,6 +21,7 @@ enum ShareLinkVisibility {
 
 enum ShareLinkPermission {
   READ
+  READ_METADATA
 }
 
 model User {

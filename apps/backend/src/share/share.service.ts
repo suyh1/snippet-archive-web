@@ -230,6 +230,14 @@ export class ShareService {
       }
     }
 
+    const file =
+      shareLink.permission === 'READ_METADATA'
+        ? {
+            ...shareLink.file,
+            content: null,
+          }
+        : shareLink.file
+
     return {
       id: shareLink.id,
       token: shareLink.token,
@@ -237,7 +245,7 @@ export class ShareService {
       permission: shareLink.permission,
       expiresAt: shareLink.expiresAt,
       createdAt: shareLink.createdAt,
-      file: shareLink.file,
+      file,
       workspace: shareLink.workspace,
     }
   }
