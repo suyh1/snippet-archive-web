@@ -102,7 +102,7 @@
 
 ## 2.2 阶段二（4-8 周）：团队协作升级
 
-当前状态：✅ 已完成（线程 F/G/H 全部验收通过）。
+当前状态：✅ F2-1 ~ F2-4 已完成，阶段二治理能力与指标证据闭环。
 
 ### 目标
 
@@ -260,8 +260,12 @@
 7. 线程 F：账号与组织基础（✅ 已完成）。
 8. 线程 G：权限与分享链接（✅ 已完成）。
 9. 线程 H：审计日志与管理页面（✅ 已完成）。
-10. 线程 I：VS Code 插件 PoC（未开始）。
-11. 线程 J：CLI + 导入导出协议（未开始）。
+10. 线程 F2-1：审计查询过滤完整化（✅ 已完成）。
+11. 线程 F2-2：分享权限级别收口（✅ 已完成）。
+12. 线程 F2-3：成员管理闭环（✅ 已完成）。
+13. 线程 F2-4：M2 指标证据化（✅ 已完成）。
+14. 线程 I：VS Code 插件 PoC（未开始）。
+15. 线程 J：CLI + 导入导出协议（未开始）。
 
 ## 6. 里程碑与指标
 
@@ -276,6 +280,21 @@
 1. 团队工作区占比提升。
 2. 分享链接使用量提升。
 3. 权限相关事故为 0（越权写入）。
+
+#### M2 指标口径（F2-4 固化）
+
+1. 团队工作区占比：
+   - 口径：滚动 30 天内 `organizationId` 非空工作区数 / 同周期工作区总数。
+   - 统计周期：`[asOf - 30 天, asOf]`（按 UTC 时间窗口）。
+2. 分享链接使用量：
+   - 口径：滚动 30 天内创建的分享链接数量（`ShareLink.createdAt`）。
+   - 统计周期：`[asOf - 30 天, asOf]`。
+3. 权限事故数（越权写入）：
+   - 口径：滚动 30 天内写操作审计日志中“可验证”的越权事件数量。
+   - 判定：若 actor 缺失则记事故；若 actor 角色在事件时刻可证明低于该 action 所需最小角色则记事故；
+     无法证明（成员缺失/成员更新时间晚于事件）记 `unknown`，不计入事故。
+4. 统一复算命令：
+   - `npm run metrics:m2 --workspace @snippet-archive/backend -- --as-of=<ISO 时间> --window-days=30`
 
 ### 里程碑 M3（阶段三结束）
 
@@ -1077,4 +1096,194 @@ Z5 全局会话出口收口：
      - `npm run --workspace @snippet-archive/frontend test:run`
      - `npm run --workspace @snippet-archive/frontend test:e2e:smoke`
      - `npm run --workspace @snippet-archive/frontend typecheck`
+     - `npm run build`
+
+## 21. 阶段二缺口收口执行细化（线程 F2-1 ~ F2-4）
+
+### 21.1 收口目标
+
+1. 补齐阶段二验收标准中“前端查询能力、分享权限级别、成员管理闭环、里程碑证据化”四项缺口。
+2. 保持既有 F/G/H 主体能力稳定，不引入权限回退与布局回归。
+3. 严格按 `TESTING.md` 执行：先红后绿 + 行为级验证 + 全量门禁证据。
+
+### 21.2 线程 F2-1（审计查询过滤完整化）
+
+F2-1 线程目标：
+1. 前端审计查询补齐 `actorId/from/to` 过滤输入与交互。
+2. 查询结果支持组合过滤回显，满足“按时间、用户、操作类型检索”。
+
+F2-1 小功能点清单（逐项打标）：
+- [x] F2-1-1：`TeamPage` 新增审计 `actorId/from/to` 输入与状态管理。
+- [x] F2-1-2：`auditApi.listOrganizationAuditLogs` 补齐参数透传与默认值处理。
+- [x] F2-1-3：新增前端回归（unit + e2e），覆盖 click/keyboard/focus-blur/state 四类行为。
+- [x] F2-1-4：补“组合过滤”与“空结果/错误提示”断言。
+- [x] F2-1-5：通过 targeted + full gate，并追加命令证据。
+
+F2-1 验收标准：
+1. 审计查询支持 `action + actorId + from/to` 任意组合。
+2. 团队页可视交互与查询结果一致，错误码提示继续区分 `UNAUTHORIZED/FORBIDDEN/NOT_FOUND/GONE`。
+
+### 21.3 线程 F2-2（分享权限级别收口）
+
+F2-2 线程目标：
+1. 补齐“分享链接可权限级别”能力，避免仅有单一 `READ` 权限。
+2. 保持撤销、过期、可见性（PRIVATE/TEAM/PUBLIC）既有行为不回退。
+
+F2-2 小功能点清单（逐项打标）：
+- [x] F2-2-1：扩展 `ShareLinkPermission`（推荐新增 `READ_METADATA`，与 `READ` 形成至少两级）。
+- [x] F2-2-2：后端 `resolveSharedFileByToken` 按权限级别返回差异化数据（如 `READ_METADATA` 不返回文件正文）。
+- [x] F2-2-3：前端团队页新增“权限级别”选择控件，并补禁用/可用性断言。
+- [x] F2-2-4：更新 OpenAPI 文档与前端 API 类型定义，保证协议一致。
+- [x] F2-2-5：新增回归覆盖：未授权、越权、过期、撤销、不同权限级别访问差异。
+- [x] F2-2-6：通过 targeted + full gate，并追加命令证据。
+
+F2-2 验收标准：
+1. 分享链接在“可见性 + 权限级别”两个维度都可配置且可验证。
+2. e2e 能稳定复现不同权限级别下的访问结果差异。
+
+### 21.4 线程 F2-3（成员管理闭环）
+
+F2-3 线程目标：
+1. 团队页补齐成员“调权/移除”操作，不再仅支持添加。
+2. 高风险移除操作补取消/确认双路径与持久化校验。
+
+F2-3 小功能点清单（逐项打标）：
+- [x] F2-3-1：`TeamPage` 成员列表新增“角色调整”与“移除成员”操作区。
+- [x] F2-3-2：接入 `organizationApi.updateMemberRole/removeMember`，并处理加载态与错误提示。
+- [x] F2-3-3：移除成员使用项目自定义确认交互（禁止原生 `window.confirm`）。
+- [x] F2-3-4：新增后端 e2e：Owner 保护、Owner 自降级保护、越权调权/移除拒绝。
+- [x] F2-3-5：新增前端 unit + e2e：调权成功、移除取消、移除确认、状态回显。
+- [x] F2-3-6：通过 targeted + full gate，并追加命令证据。
+
+F2-3 验收标准：
+1. 团队页完整覆盖成员增删改查中的“改/删”链路。
+2. 危险操作满足取消与确认双路径，且持久化结果可验证。
+
+### 21.5 线程 F2-4（M2 指标证据化）
+
+F2-4 线程目标：
+1. 将 M2 指标从“口头目标”升级为“可复算、可追溯”的固定输出。
+2. 在文档内补齐基线/统计口径/当前结果，支撑阶段二最终验收结论。
+
+F2-4 小功能点清单（逐项打标）：
+- [x] F2-4-1：定义 3 项指标的数据口径与统计周期（团队工作区占比、分享链接使用量、权限事故数）。
+- [x] F2-4-2：新增可复算脚本或 SQL（建议放 `apps/backend/scripts/metrics/`）。
+- [x] F2-4-3：产出首版指标报告并回填本执行文档（含日期与原始命令）。
+- [x] F2-4-4：补最小回归守护（脚本可执行性 / 输出结构校验）。
+- [x] F2-4-5：通过 targeted gate 并追加命令证据。
+
+F2-4 验收标准：
+1. M2 三项指标都有“口径定义 + 可复算命令 + 当前数值 + 日期”。
+2. 后续可按同一命令重复生成，避免手工口径漂移。
+
+### 21.6 推荐执行顺序（便于逐步实施）
+
+1. 优先线程 F2-2（先补分享协议能力，避免后续 API/前端返工）。
+2. 然后线程 F2-3（成员治理闭环，补高风险操作链路）。
+3. 接着线程 F2-1（审计查询前端过滤完整化，提升治理可查性）。
+4. 最后线程 F2-4（统一沉淀 M2 指标证据，形成阶段二最终验收包）。
+
+### 21.7 当前状态
+
+1. 当前状态：✅ F2-1/F2-2/F2-3/F2-4 全部完成。
+2. 当前阻塞：无（阶段二收口项已清零）。
+
+### 2026-03-19｜线程 F2-4（M2 指标证据化）
+
+1. 目标：将 M2 三项指标沉淀为“可复算口径 + 固定命令 + 可追溯首版数据”，形成阶段二验收证据闭环。
+2. 结果：
+   - 指标口径：在“里程碑 M2”下新增固定口径，明确时间窗口、分子分母与权限事故判定规则（含 `unknown` 处理）。
+   - 可复算脚本：
+     - 新增 `apps/backend/scripts/metrics/m2-metrics.ts`，支持 `--as-of` 与 `--window-days` 参数，输出结构化 JSON。
+     - 新增 npm 命令：`npm run metrics:m2 --workspace @snippet-archive/backend -- --as-of=<ISO> --window-days=30`。
+   - 最小回归守护：
+     - 新增 `apps/backend/src/metrics/m2-metrics.spec.ts`，覆盖口径计算、越权判定与输出结构稳定性。
+   - 首版基线（`asOf=2026-03-19T00:00:00.000Z`，窗口 30 天）：
+     - 团队工作区占比：`1 / 16 = 6.25%`
+     - 分享链接使用量：`1`
+     - 权限事故数：`0`（`unknown=0`，`evaluated=422`）
+3. 验证命令（均通过）：
+   - 目标回归（先红后绿）：
+     - `npm run test --workspace @snippet-archive/backend -- src/metrics/m2-metrics.spec.ts`
+     - `npm run metrics:m2 --workspace @snippet-archive/backend -- --as-of=2026-03-19T00:00:00.000Z --window-days=30`
+   - 后端门禁：
+     - `npm run test --workspace @snippet-archive/backend`
+     - `npm run test:e2e --workspace @snippet-archive/backend`
+   - 前端门禁：
+     - `npm run test:run --workspace @snippet-archive/frontend`
+     - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
+     - `npm run typecheck --workspace @snippet-archive/frontend`
+   - 全量构建：
+     - `npm run build`
+
+### 2026-03-19｜线程 F2-1（审计查询过滤完整化）
+
+1. 目标：补齐团队页审计查询的 `actorId/from/to` 过滤输入与组合查询闭环，覆盖 click/keyboard/focus-blur/state 行为，并补空结果/错误提示断言。
+2. 结果：
+   - 前端能力：`TeamPage` 审计区新增 `actorId`、开始时间、结束时间输入；支持 `Enter` 触发查询与 `blur` 归一化（trim/datetime-local 标准化）。
+   - 请求协议：`loadAuditLogs` 透传 `action + actorId + from + to + page + pageSize`；`auditApi.listOrganizationAuditLogs` 增加字符串参数规范化（trim + 空值忽略）。
+   - 结果呈现：新增“暂无匹配审计记录”空态提示；审计查询失败维持显式错误反馈。
+   - 回归覆盖：
+     - 前端 unit：新增组合过滤参数断言（含 keyboard/blur）、空态断言、错误提示断言。
+     - 前端 e2e：新增真实请求 query 参数断言（`action/actorId/from/to`），并覆盖组合过滤空结果回显。
+     - 后端 e2e：补齐审计接口 `action + actorId + from/to` 组合过滤与空结果断言。
+3. 验证命令（均通过）：
+   - 目标回归（先红后绿）：
+     - `npm run test:run --workspace @snippet-archive/frontend -- src/pages/TeamPage.spec.ts`
+     - `npm run test:e2e:smoke --workspace @snippet-archive/frontend -- e2e/team-collaboration.spec.ts`
+     - `npm run test:e2e --workspace @snippet-archive/backend -- audit-logs.e2e-spec.ts`
+   - 后端门禁：
+     - `npm run test --workspace @snippet-archive/backend`
+     - `npm run test:e2e --workspace @snippet-archive/backend`
+   - 前端门禁：
+     - `npm run test:run --workspace @snippet-archive/frontend`
+     - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
+     - `npm run typecheck --workspace @snippet-archive/frontend`
+   - 全量构建：
+     - `npm run build`
+
+### 2026-03-18｜线程 F2-2（分享权限级别收口）
+
+1. 目标：补齐“分享链接可权限级别”能力，形成 `READ` + `READ_METADATA` 两级访问语义，并补撤销与文档守护回归。
+2. 结果：
+   - 后端能力：`ShareLinkPermission` 新增 `READ_METADATA`；共享访问在 metadata 模式下返回文件元数据且 `content=null`。
+   - 前端能力：团队页新增“权限级别”选择器，创建分享链接支持选择并展示权限级别。
+   - 回归覆盖：补齐后端 e2e（权限级别差异 + 撤销后 410）、前端 unit/e2e（权限选择与回显）、Swagger 枚举守护。
+   - 文档协议：OpenAPI 同步新增枚举值，并将 `SharedFile.content` 标记为可空。
+3. 验证命令（均通过）：
+   - 目标回归（先红后绿）：
+     - `npm run test:e2e --workspace @snippet-archive/backend -- permissions-share.e2e-spec.ts`
+     - `npm run test:run --workspace @snippet-archive/frontend -- src/pages/TeamPage.spec.ts`
+     - `npm run test:e2e:smoke --workspace @snippet-archive/frontend -- e2e/team-collaboration.spec.ts`
+   - 后端门禁：
+     - `npm run test --workspace @snippet-archive/backend`
+     - `npm run test:e2e --workspace @snippet-archive/backend`
+   - 前端门禁：
+     - `npm run test:run --workspace @snippet-archive/frontend`
+     - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
+     - `npm run typecheck --workspace @snippet-archive/frontend`
+   - 全量构建：
+     - `npm run build`
+
+### 2026-03-18｜线程 F2-3（成员管理闭环）
+
+1. 目标：补齐团队页成员“调权/移除”能力，覆盖危险操作的取消/确认双路径，并验证后端 Owner 保护与越权拒绝。
+2. 结果：
+   - 前端能力：团队页成员列表新增“角色调整 + 更新角色 + 移除成员”操作；移除走项目 `ConfirmDialog`，未使用原生 `window.confirm`。
+   - 状态一致性：成员调权后行内角色即时回显；移除取消保持原列表；移除确认后列表与本地状态同步更新。
+   - 后端回归：`auth-organization.e2e` 新增成员管理保护用例，覆盖非 Owner 调权/移除拒绝、Owner 自降级保护、Owner 自删除保护，以及 Owner 正向调权与移除链路。
+   - 前端回归：`TeamPage.spec` 与 `team-collaboration.e2e` 新增调权成功、移除取消、移除确认、无原生弹窗断言。
+3. 验证命令（均通过）：
+   - 目标回归（先红后绿）：
+     - `npm run test:run --workspace @snippet-archive/frontend -- src/pages/TeamPage.spec.ts`
+     - `npm run test:e2e:smoke --workspace @snippet-archive/frontend -- e2e/team-collaboration.spec.ts`
+     - `npm run test:e2e --workspace @snippet-archive/backend -- auth-organization.e2e-spec.ts`
+   - 后端门禁：
+     - `npm run test --workspace @snippet-archive/backend`
+     - `npm run test:e2e --workspace @snippet-archive/backend`
+   - 前端门禁：
+     - `npm run test:run --workspace @snippet-archive/frontend`
+     - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
+     - `npm run typecheck --workspace @snippet-archive/frontend`
+   - 全量构建：
      - `npm run build`

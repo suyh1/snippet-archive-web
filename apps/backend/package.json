@@ -8,6 +8,7 @@
     "test": "jest --config ./jest.config.cjs --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
     "benchmark:search": "tsx ./scripts/benchmark-search.ts",
+    "metrics:m2": "tsx ./scripts/metrics/m2-metrics.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   },
