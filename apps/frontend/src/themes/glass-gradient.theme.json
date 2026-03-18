@@ -3,15 +3,15 @@
   "meta": {
     "id": "glass-gradient",
     "name": "Glass Gradient",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "author": "Snippet Archive",
-    "description": "Default frosted glass theme with layered cyan-blue gradients."
+    "description": "经典玻璃渐变主题，浅蓝层次清爽且通用。"
   },
   "modules": {
     "layout": {
-      "appFontFamily": "'Manrope', 'Plus Jakarta Sans', 'Avenir Next', sans-serif",
+      "appFontFamily": "'Space Grotesk', 'DM Sans', 'Noto Sans SC', sans-serif",
       "bodyBackground": "linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)",
-      "appShellBackground": "radial-gradient(circle at 12% 8%, rgba(56, 189, 248, 0.26), transparent 40%), radial-gradient(circle at 88% 0%, rgba(20, 184, 166, 0.24), transparent 36%), radial-gradient(circle at 45% 100%, rgba(99, 102, 241, 0.2), transparent 45%), linear-gradient(160deg, #e0f2fe 0%, #e2e8f0 52%, #dbeafe 100%)",
+      "appShellBackground": "radial-gradient(circle at 10% 8%, rgba(56, 189, 248, 0.32), transparent 38%), radial-gradient(circle at 86% 2%, rgba(99, 102, 241, 0.24), transparent 34%), radial-gradient(circle at 50% 100%, rgba(45, 212, 191, 0.22), transparent 42%), linear-gradient(160deg, #e0f2fe 0%, #dbeafe 50%, #dbeafe 100%)",
       "sidebarBackground": "radial-gradient(circle at 14% 12%, rgba(125, 211, 252, 0.24), transparent 45%), radial-gradient(circle at 80% 100%, rgba(20, 184, 166, 0.2), transparent 40%), linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(30, 41, 59, 0.9))",
       "sidebarText": "#e2e8f0",
       "sidebarBorder": "rgba(148, 163, 184, 0.28)"
@@ -60,7 +60,7 @@
       "toastBorder": "rgba(148, 163, 184, 0.35)",
       "toastShadow": "0 14px 28px rgba(15, 23, 42, 0.28)",
       "toolbarGlassBorder": "rgba(216, 235, 255, 0.58)",
-      "toolbarGlassBackground": "radial-gradient(130% 190% at 12% -34%, rgba(94, 186, 255, 0.28) 0%, rgba(94, 186, 255, 0) 56%), radial-gradient(140% 200% at 90% -48%, rgba(156, 138, 255, 0.24) 0%, rgba(156, 138, 255, 0) 58%), var(--theme-surface-glass-header-background)",
+      "toolbarGlassBackground": "radial-gradient(132% 192% at 12% -34%, rgba(94, 186, 255, 0.34) 0%, rgba(94, 186, 255, 0) 54%), radial-gradient(138% 198% at 90% -48%, rgba(139, 122, 255, 0.26) 0%, rgba(139, 122, 255, 0) 56%), radial-gradient(120% 156% at 50% 122%, rgba(45, 212, 191, 0.18) 0%, rgba(45, 212, 191, 0) 58%), var(--theme-surface-glass-header-background)",
       "toolbarGlassBackdropFilter": "blur(27px) saturate(1.45) contrast(1.07)",
       "toolbarGlassShadow": "0 20px 44px rgba(7, 14, 28, 0.44), 0 8px 22px rgba(31, 82, 150, 0.3), inset 0 1px 0 rgba(236, 245, 255, 0.44), inset 0 -1px 0 rgba(101, 129, 186, 0.3)",
       "toolbarGlassHighlightArc": "radial-gradient(104% 94% at 50% 100%, rgba(255, 255, 255, 0.64) 0%, rgba(255, 255, 255, 0.3) 36%, rgba(255, 255, 255, 0.1) 58%, rgba(255, 255, 255, 0) 76%)",
@@ -80,7 +80,7 @@
       "toolbarCaptureBackground": "var(--theme-accent-primary-button-gradient)"
     },
     "accent": {
-      "primaryButtonGradient": "linear-gradient(130deg, rgba(14, 165, 233, 0.9), rgba(56, 189, 248, 0.82))",
+      "primaryButtonGradient": "linear-gradient(132deg, rgba(14, 165, 233, 0.92), rgba(59, 130, 246, 0.84))",
       "primaryButtonBorder": "rgba(14, 165, 233, 0.5)",
       "primaryButtonText": "#f8fafc",
       "actionButtonBorder": "rgba(148, 163, 184, 0.48)",

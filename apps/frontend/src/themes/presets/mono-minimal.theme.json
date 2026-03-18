@@ -3,15 +3,15 @@
   "meta": {
     "id": "mono-minimal",
     "name": "Mono Minimal",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "author": "Snippet Archive",
-    "description": "Minimal monochrome system theme for focused editing."
+    "description": "单色极简主题，黑白灰秩序突出内容本身。"
   },
   "modules": {
     "layout": {
-      "appFontFamily": "'IBM Plex Sans', 'Noto Sans SC', 'Segoe UI', sans-serif",
+      "appFontFamily": "'Space Mono', 'Fira Sans', 'Noto Sans SC', sans-serif",
       "bodyBackground": "linear-gradient(180deg, #fafafa 0%, #efefef 100%)",
-      "appShellBackground": "radial-gradient(circle at 14% 8%, rgba(115, 115, 115, 0.14), transparent 42%), radial-gradient(circle at 86% 2%, rgba(163, 163, 163, 0.16), transparent 38%), linear-gradient(160deg, #f5f5f5 0%, #ededed 52%, #e7e7e7 100%)",
+      "appShellBackground": "radial-gradient(circle at 14% 8%, rgba(115, 115, 115, 0.2), transparent 42%), radial-gradient(circle at 86% 2%, rgba(163, 163, 163, 0.22), transparent 38%), radial-gradient(circle at 50% 100%, rgba(64, 64, 64, 0.12), transparent 44%), linear-gradient(160deg, #f8f8f8 0%, #ededed 52%, #e3e3e3 100%)",
       "sidebarBackground": "linear-gradient(180deg, rgba(17, 24, 39, 0.97), rgba(31, 41, 55, 0.93))",
       "sidebarText": "#e5e7eb",
       "sidebarBorder": "rgba(107, 114, 128, 0.46)"
@@ -60,7 +60,7 @@
       "toastBorder": "rgba(148, 163, 184, 0.35)",
       "toastShadow": "0 14px 28px rgba(15, 23, 42, 0.28)",
       "toolbarGlassBorder": "rgba(154, 163, 177, 0.44)",
-      "toolbarGlassBackground": "radial-gradient(126% 184% at 12% -28%, rgba(187, 197, 211, 0.18) 0%, rgba(187, 197, 211, 0) 54%), radial-gradient(132% 190% at 90% -44%, rgba(132, 147, 168, 0.16) 0%, rgba(132, 147, 168, 0) 56%), var(--theme-surface-glass-header-background)",
+      "toolbarGlassBackground": "radial-gradient(130% 190% at 12% -28%, rgba(187, 197, 211, 0.24) 0%, rgba(187, 197, 211, 0) 54%), radial-gradient(132% 192% at 90% -44%, rgba(132, 147, 168, 0.2) 0%, rgba(132, 147, 168, 0) 56%), radial-gradient(116% 148% at 50% 122%, rgba(82, 82, 91, 0.14) 0%, rgba(82, 82, 91, 0) 58%), var(--theme-surface-glass-header-background)",
       "toolbarGlassBackdropFilter": "blur(22px) saturate(1.08) contrast(1.02)",
       "toolbarGlassShadow": "0 16px 34px rgba(17, 24, 39, 0.24), 0 6px 16px rgba(68, 85, 110, 0.16), inset 0 1px 0 rgba(248, 250, 252, 0.36), inset 0 -1px 0 rgba(122, 137, 158, 0.2)",
       "toolbarGlassHighlightArc": "radial-gradient(102% 92% at 50% 100%, rgba(252, 253, 255, 0.46) 0%, rgba(252, 253, 255, 0.2) 38%, rgba(252, 253, 255, 0.06) 58%, rgba(252, 253, 255, 0) 76%)",
@@ -80,7 +80,7 @@
       "toolbarCaptureBackground": "var(--theme-accent-primary-button-gradient)"
     },
     "accent": {
-      "primaryButtonGradient": "linear-gradient(130deg, rgba(55, 65, 81, 0.92), rgba(75, 85, 99, 0.84))",
+      "primaryButtonGradient": "linear-gradient(132deg, rgba(55, 65, 81, 0.94), rgba(82, 82, 91, 0.86))",
       "primaryButtonBorder": "rgba(75, 85, 99, 0.62)",
       "primaryButtonText": "#f9fafb",
       "actionButtonBorder": "rgba(156, 163, 175, 0.62)",

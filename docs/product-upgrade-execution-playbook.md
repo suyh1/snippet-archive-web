@@ -995,3 +995,86 @@ Z5 全局会话出口收口：
    - 回归：`apps/backend/test/swagger.e2e-spec.ts` 新增 `/docs/json` 断言，确保关键阶段二路径（auth/org/share/audit）存在。
 3. 验证命令（均通过）：
    - `npm run test:e2e --workspace @snippet-archive/backend -- swagger.e2e-spec.ts`
+
+### 2026-03-18｜前端主题重设计（UI/UX Pro Max + Frontend Design）
+
+1. 目标：解决“主题平庸、页面辨识度不足、交互反馈偏弱”问题；重做多套主题并同步升级设置页与壳层视觉交互。
+2. 结果：
+   - 主题体系：新增 4 套预置主题并接入系统目录，形成 13 套可切换主题。
+     - `editorial-noir`（编辑感黑金玫红）
+     - `brutal-signal`（高对比原始信号风）
+     - `biome-light`（有机浅色薄荷珊瑚）
+     - `deco-circuit`（装饰艺术暗色电路）
+   - 页面改版：设置页“主题”升级为 Theme Lab 卡片化预览（字体标签、色带、描述、键盘/点击快速应用），并保留导入导出链路。
+   - 交互优化：壳层导航与快速捕获面板补齐 hover/active/focus-visible 反馈与 reduced-motion 兼容，提升可用性与一致性。
+   - 回归策略：按 `TESTING.md` 先红后绿执行，新增/更新主题相关单测与 e2e 断言后完成实现收口。
+3. 验证命令：
+   - 先红（已触发失败）：
+     - `npm run --workspace @snippet-archive/frontend test:run -- src/App.settings.spec.ts src/themes/theme-runtime.spec.ts`
+   - 目标回归（通过）：
+     - `npm run --workspace @snippet-archive/frontend test:run -- src/App.settings.spec.ts src/themes/theme-runtime.spec.ts`
+     - `npm run --workspace @snippet-archive/frontend test:e2e:smoke -- e2e/settings-languages.spec.ts`
+   - 全量门禁（通过）：
+     - `npm run --workspace @snippet-archive/frontend test:run`
+     - `npm run --workspace @snippet-archive/frontend test:e2e:smoke`
+     - `npm run --workspace @snippet-archive/frontend typecheck`
+     - `npm run build`
+   - 额外检查（存在历史遗留失败，未在本次改动中引入新失败项）：
+   - `npm run --workspace @snippet-archive/frontend check:theme-guards`
+   - 失败来源：`src/pages/LoginPage.vue`、`src/pages/TeamPage.vue` 既有硬编码颜色规则。
+
+### 2026-03-18｜主题实验室可视区修复 + 原有主题视觉升级
+
+1. 目标：
+   - 修复“全局主题实验室高度过低，难以浏览完整主题卡片”的可用性问题。
+   - 对原有主题进行 1.1 视觉升级，降低同质化并提升层次表现。
+2. 结果：
+   - 主题实验室：
+     - 主题卡片区最小可视高度提升（默认可浏览区显著增大）。
+     - 主题教程改为“默认折叠、按需展开”，将首屏空间优先给主题浏览与切换。
+     - 展开后教程仍保持独立滚动，支持继续导入/导出与快速应用流程。
+   - 原有主题（9 套）升级：
+     - `meta.version` 升级至 `1.1.0`，描述文案更新。
+     - 每套主题更新 `layout.appFontFamily`，提高字体风格区分度。
+     - 每套主题更新 `layout.appShellBackground`、`surface.toolbarGlassBackground`、`accent.primaryButtonGradient`，增强空间层次与品牌辨识度。
+3. 验证命令：
+   - 先红（已触发失败）：
+     - `npm run --workspace @snippet-archive/frontend test:run -- src/themes/theme-runtime.spec.ts`
+     - `npm run --workspace @snippet-archive/frontend test:e2e:smoke -- e2e/settings-languages.spec.ts -g "settings themes tutorial stays contained and is scrollable"`
+   - 目标回归（通过）：
+     - `npm run --workspace @snippet-archive/frontend test:run -- src/App.settings.spec.ts src/themes/theme-runtime.spec.ts`
+     - `npm run --workspace @snippet-archive/frontend test:e2e:smoke -- e2e/settings-languages.spec.ts -g "settings themes tutorial stays contained and is scrollable"`
+   - 全量门禁（通过）：
+     - `npm run --workspace @snippet-archive/frontend test:run`
+     - `npm run --workspace @snippet-archive/frontend test:e2e:smoke`
+     - `npm run --workspace @snippet-archive/frontend typecheck`
+     - `npm run build`
+
+### 2026-03-18｜第二轮主题强化（3 套差异化 + 1 套水墨）与 Theme Lab 中文化
+
+1. 目标：
+   - 在现有主题体系基础上继续强化视觉差异，新增 3 套更大胆方向并补 1 套水墨风格主题。
+   - 主题设置中移除“系统预置主题下拉框”，统一使用全局主题实验室卡片切换。
+   - 将全局主题实验室介绍文案统一为中文。
+2. 结果：
+   - 新增 4 套主题并接入系统内置目录（总量提升至 17 套）：
+     - `acid-rush`（酸性霓虹）
+     - `lava-forge`（熔岩锻造）
+     - `cobalt-flux`（钴蓝高能）
+     - `ink-wash-zen`（水墨留白）
+   - 交互改造：
+     - 删除设置页“系统预置主题”下拉框及其逻辑，保留并强化卡片式快速切换（点击 + 键盘）。
+   - 文案与信息层：
+     - Theme Lab 顶部介绍、主题模板示例字段说明改为中文表达。
+     - 内置主题描述统一改为中文，保证主题实验室“介绍信息”一致中文化。
+   - 测试同步：
+     - 单测与 e2e 从“下拉框切换断言”迁移为“卡片切换断言”，并扩展到 17 套主题循环切换。
+3. 验证命令（均通过）：
+   - 目标回归：
+     - `npm run --workspace @snippet-archive/frontend test:run -- src/App.settings.spec.ts src/themes/theme-runtime.spec.ts`
+     - `npm run --workspace @snippet-archive/frontend test:e2e:smoke -- e2e/settings-languages.spec.ts`
+   - 全量门禁：
+     - `npm run --workspace @snippet-archive/frontend test:run`
+     - `npm run --workspace @snippet-archive/frontend test:e2e:smoke`
+     - `npm run --workspace @snippet-archive/frontend typecheck`
+     - `npm run build`

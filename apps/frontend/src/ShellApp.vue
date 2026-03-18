@@ -622,8 +622,7 @@ onBeforeUnmount(() => {
 .route-shell {
   position: relative;
   min-height: 100vh;
-  background: radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 45%),
-    var(--theme-layout-app-shell-background);
+  background: var(--theme-surface-toolbar-glass-tint-overlay), var(--theme-layout-app-shell-background);
 }
 
 .route-shell-main-nav {
@@ -636,24 +635,44 @@ onBeforeUnmount(() => {
   gap: 8px;
   flex-wrap: wrap;
   max-width: calc(100vw - 180px);
+  padding: 6px 9px;
+  border: 1px solid var(--theme-surface-toolbar-glass-border);
+  border-radius: 999px;
+  background: var(--theme-surface-toolbar-glass-background);
+  -webkit-backdrop-filter: var(--theme-surface-toolbar-glass-backdrop-filter);
+  backdrop-filter: var(--theme-surface-toolbar-glass-backdrop-filter);
+  box-shadow: var(--theme-surface-toolbar-glass-shadow);
 }
 
 .main-nav-link {
   text-decoration: none;
-  border: 1px solid var(--theme-surface-statusbar-border);
+  border: 1px solid var(--theme-surface-toolbar-link-border);
   border-radius: 999px;
   padding: 6px 12px;
-  color: var(--theme-text-secondary);
-  background: var(--theme-surface-glass-header-background);
-  backdrop-filter: var(--theme-surface-overlay-blur);
+  color: var(--theme-surface-toolbar-link-text);
+  background: var(--theme-surface-toolbar-link-background);
+  box-shadow: var(--theme-surface-toolbar-link-inset-shadow);
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
   font-size: 13px;
   line-height: 1.2;
 }
 
+.main-nav-link:hover {
+  border-color: var(--theme-surface-toolbar-link-hover-border);
+  background: var(--theme-surface-toolbar-link-hover-background);
+  transform: translateY(-1px);
+}
+
 .main-nav-link.active {
-  border-color: var(--theme-accent-selected-border);
-  background: var(--theme-surface-row-active-background);
-  color: var(--theme-accent-selected-text);
+  border-color: var(--theme-surface-toolbar-link-active-border);
+  background: var(--theme-surface-toolbar-link-active-background);
+  color: var(--theme-surface-toolbar-link-active-text);
+  box-shadow: var(--theme-surface-toolbar-link-active-shadow);
 }
 
 .route-shell-header {
@@ -727,7 +746,9 @@ onBeforeUnmount(() => {
   transition:
     border-color 120ms ease,
     background 120ms ease,
+    color 120ms ease,
     transform 120ms ease;
+  cursor: pointer;
 }
 
 .route-shell-capture-link {
@@ -779,6 +800,18 @@ onBeforeUnmount(() => {
   line-height: 1;
   appearance: none;
   -webkit-appearance: none;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.route-shell-icon-action:hover {
+  border-color: var(--theme-surface-toolbar-link-hover-border);
+  background: var(--theme-surface-toolbar-link-hover-background);
+  color: var(--theme-surface-toolbar-link-hover-border);
+  transform: translateY(-1px);
 }
 
 .route-shell-icon-action:disabled {
@@ -798,10 +831,30 @@ onBeforeUnmount(() => {
   color: var(--theme-accent-primary-button-text);
 }
 
+.route-shell-icon-action.primary:hover {
+  border-color: var(--theme-accent-primary-button-border);
+  background: var(--theme-accent-primary-button-gradient);
+  color: var(--theme-accent-primary-button-text);
+  filter: brightness(1.04);
+}
+
 .route-shell-icon-action.active {
   border-color: var(--theme-accent-selected-border);
   background: var(--theme-surface-row-active-background);
   color: var(--theme-accent-selected-text);
+}
+
+.route-shell-icon-action:focus-visible,
+.route-shell-link:focus-visible,
+.main-nav-link:focus-visible,
+.quick-capture-close:focus-visible,
+.quick-capture-actions button:focus-visible,
+.quick-capture-body input:focus-visible,
+.quick-capture-body select:focus-visible,
+.quick-capture-body textarea:focus-visible {
+  outline: 2px solid var(--theme-accent-focus-border);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px var(--theme-accent-focus-ring);
 }
 
 .route-shell-content {
@@ -824,10 +877,11 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto auto;
   gap: 10px;
-  border-radius: 16px;
-  border: 1px solid var(--theme-surface-glass-panel-border);
-  background: var(--theme-surface-glass-card-background);
-  box-shadow: var(--theme-surface-glass-panel-shadow);
+  border-radius: 18px;
+  border: 1px solid var(--theme-surface-toolbar-glass-border);
+  backdrop-filter: var(--theme-surface-toolbar-glass-backdrop-filter);
+  background: var(--theme-surface-toolbar-glass-tint-overlay), var(--theme-surface-glass-card-background);
+  box-shadow: var(--theme-surface-toolbar-glass-shadow);
   padding: 14px 16px;
 }
 
@@ -842,6 +896,8 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--theme-surface-statusbar-border);
 }
 
 .quick-capture-head p {
@@ -858,6 +914,15 @@ onBeforeUnmount(() => {
   padding: 4px 8px;
   font-size: 12px;
   cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    transform 150ms ease;
+}
+
+.quick-capture-close:hover {
+  border-color: var(--theme-accent-row-action-border);
+  transform: translateY(-1px);
 }
 
 .quick-capture-body {
@@ -873,7 +938,8 @@ onBeforeUnmount(() => {
   gap: 4px;
   color: var(--theme-text-secondary);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .quick-capture-body input,
@@ -915,6 +981,15 @@ onBeforeUnmount(() => {
   border-radius: 8px;
   padding: 6px 11px;
   cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    transform 150ms ease;
+}
+
+.quick-capture-actions button:hover {
+  border-color: var(--theme-accent-row-action-border);
+  transform: translateY(-1px);
 }
 
 .quick-capture-actions button.primary {
@@ -923,9 +998,27 @@ onBeforeUnmount(() => {
   color: var(--theme-accent-primary-button-text);
 }
 
+.quick-capture-actions button.primary:hover {
+  border-color: var(--theme-accent-primary-button-border);
+  background: var(--theme-accent-primary-button-gradient);
+  filter: brightness(1.04);
+}
+
 .quick-capture-actions button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-shell-header,
+  .route-shell-link,
+  .main-nav-link,
+  .route-shell-icon-action,
+  .quick-capture-close,
+  .quick-capture-actions button {
+    animation: none;
+    transition: none;
+  }
 }
 
 @media (max-width: 900px) {

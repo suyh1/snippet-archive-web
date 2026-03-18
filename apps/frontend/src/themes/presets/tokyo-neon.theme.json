@@ -3,15 +3,15 @@
   "meta": {
     "id": "tokyo-neon",
     "name": "Tokyo Neon",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "author": "Snippet Archive",
-    "description": "Vibrant cyberpunk dark theme with cyan and magenta accents."
+    "description": "东京霓虹主题，青紫电光强化夜间活力表达。"
   },
   "modules": {
     "layout": {
-      "appFontFamily": "'Manrope', 'Plus Jakarta Sans', 'Avenir Next', sans-serif",
+      "appFontFamily": "'Space Grotesk', 'Fira Sans', 'Noto Sans SC', sans-serif",
       "bodyBackground": "linear-gradient(180deg, #0a0f1f 0%, #14182d 100%)",
-      "appShellBackground": "radial-gradient(circle at 12% 6%, rgba(34, 211, 238, 0.28), transparent 38%), radial-gradient(circle at 88% 2%, rgba(217, 70, 239, 0.24), transparent 36%), radial-gradient(circle at 52% 100%, rgba(59, 130, 246, 0.24), transparent 44%), linear-gradient(160deg, #0b1120 0%, #11162a 52%, #161a34 100%)",
+      "appShellBackground": "radial-gradient(circle at 12% 6%, rgba(34, 211, 238, 0.34), transparent 36%), radial-gradient(circle at 88% 2%, rgba(217, 70, 239, 0.3), transparent 34%), radial-gradient(circle at 52% 100%, rgba(59, 130, 246, 0.26), transparent 44%), linear-gradient(160deg, #090f20 0%, #10162a 52%, #181d3a 100%)",
       "sidebarBackground": "radial-gradient(circle at 18% 14%, rgba(6, 182, 212, 0.24), transparent 45%), radial-gradient(circle at 82% 100%, rgba(217, 70, 239, 0.18), transparent 42%), linear-gradient(180deg, rgba(12, 15, 36, 0.98), rgba(27, 23, 54, 0.94))",
       "sidebarText": "#e0e7ff",
       "sidebarBorder": "rgba(129, 140, 248, 0.4)"
@@ -60,7 +60,7 @@
       "toastBorder": "rgba(148, 163, 184, 0.35)",
       "toastShadow": "0 14px 28px rgba(15, 23, 42, 0.28)",
       "toolbarGlassBorder": "rgba(116, 220, 255, 0.5)",
-      "toolbarGlassBackground": "radial-gradient(128% 188% at 10% -30%, rgba(44, 230, 255, 0.28) 0%, rgba(44, 230, 255, 0) 54%), radial-gradient(136% 196% at 90% -46%, rgba(250, 98, 255, 0.26) 0%, rgba(250, 98, 255, 0) 56%), var(--theme-surface-glass-header-background)",
+      "toolbarGlassBackground": "radial-gradient(130% 190% at 10% -30%, rgba(44, 230, 255, 0.32) 0%, rgba(44, 230, 255, 0) 54%), radial-gradient(136% 196% at 90% -46%, rgba(250, 98, 255, 0.3) 0%, rgba(250, 98, 255, 0) 56%), radial-gradient(118% 152% at 48% 122%, rgba(99, 102, 241, 0.2) 0%, rgba(99, 102, 241, 0) 58%), var(--theme-surface-glass-header-background)",
       "toolbarGlassBackdropFilter": "blur(28px) saturate(1.6) contrast(1.08)",
       "toolbarGlassShadow": "0 22px 44px rgba(4, 8, 18, 0.62), 0 0 24px rgba(33, 214, 255, 0.26), 0 0 26px rgba(236, 72, 255, 0.24), inset 0 1px 0 rgba(206, 248, 255, 0.34), inset 0 -1px 0 rgba(112, 64, 171, 0.28)",
       "toolbarGlassHighlightArc": "radial-gradient(104% 94% at 50% 100%, rgba(224, 255, 255, 0.52) 0%, rgba(224, 255, 255, 0.2) 34%, rgba(224, 255, 255, 0.08) 56%, rgba(224, 255, 255, 0) 74%)",
@@ -80,7 +80,7 @@
       "toolbarCaptureBackground": "var(--theme-accent-primary-button-gradient)"
     },
     "accent": {
-      "primaryButtonGradient": "linear-gradient(130deg, rgba(34, 211, 238, 0.92), rgba(217, 70, 239, 0.86))",
+      "primaryButtonGradient": "linear-gradient(132deg, rgba(34, 211, 238, 0.94), rgba(217, 70, 239, 0.88))",
       "primaryButtonBorder": "rgba(34, 211, 238, 0.66)",
       "primaryButtonText": "#0b1020",
       "actionButtonBorder": "rgba(129, 140, 248, 0.62)",

@@ -31,6 +31,7 @@ import {
   buildThemeExportPayload,
   getActiveUiTheme,
   getBuiltinUiThemeCatalog,
+  getBuiltinUiThemeFiles,
   importUiThemeFile,
   initializeUiTheme,
   isBuiltinThemeId,
@@ -191,16 +192,62 @@ const themeImportInputRef = ref<HTMLInputElement | null>(null)
 const themeFeedbackMessage = ref('')
 const activeUiTheme = ref<UiThemeFile>(getActiveUiTheme())
 const builtinThemeOptions = getBuiltinUiThemeCatalog()
+const builtinThemeFiles = getBuiltinUiThemeFiles()
+const builtinThemeMap = new Map(builtinThemeFiles.map((theme) => [theme.meta.id, theme]))
 const selectedBuiltinThemeId = ref(builtinThemeOptions[0]?.id ?? 'glass-gradient')
 const themeExportName = ref(normalizeThemeExportFileName(activeUiTheme.value.meta.id))
+
+type BuiltinThemeCard = {
+  id: string
+  name: string
+  description: string
+  fontLabel: string
+  swatches: string[]
+}
+
+function toFontLabel(fontFamilyToken: string | undefined) {
+  if (!fontFamilyToken) {
+    return '自定义'
+  }
+
+  const [firstFont] = fontFamilyToken.split(',')
+  return firstFont?.replace(/['"]/g, '').trim() || '自定义'
+}
+
+const builtinThemeCards = computed<BuiltinThemeCard[]>(() => {
+  return builtinThemeOptions.map((option) => {
+    const theme = builtinThemeMap.get(option.id)
+    if (!theme) {
+      return {
+        id: option.id,
+        name: option.name,
+        description: option.description ?? '',
+        fontLabel: '自定义',
+        swatches: ['#64748b', '#94a3b8', '#e2e8f0'],
+      }
+    }
+
+    return {
+      id: option.id,
+      name: option.name,
+      description: option.description ?? '',
+      fontLabel: toFontLabel(theme.modules.layout?.appFontFamily),
+      swatches: [
+        theme.modules.accent?.primaryButtonGradient ?? '#64748b',
+        theme.modules.surface?.glassHeaderBackground ?? '#94a3b8',
+        theme.modules.layout?.sidebarBackground ?? '#e2e8f0',
+      ],
+    }
+  })
+})
 const themeTutorialJsonTemplate = `{
   "schemaVersion": 1,
   "meta": {
     "id": "your-theme-id",
-    "name": "Your Theme Name",
+    "name": "你的主题名称",
     "version": "1.0.0",
-    "author": "Your Name",
-    "description": "Theme description"
+    "author": "你的署名",
+    "description": "主题说明（中文）"
   },
   "modules": {
     "layout": {},
@@ -256,7 +303,7 @@ const themeTutorialRules = [
   'schemaVersion 必须是 1。',
   'meta.id 与 meta.name 必填，modules 下五个分组必须齐全。',
   '导入/导出都是完整主题文件，surface 下 toolbarGlass* / toolbarLink* / toolbarCapture* 必须保留。',
-  '每个 token 值都应为非空字符串，推荐使用 #hex / rgba / gradient。',
+  '每个字段值都应为非空字符串，推荐使用 #hex / rgba / gradient。',
 ]
 const themeToolbarTokenHighlights = [
   {
@@ -385,16 +432,6 @@ function applyBuiltinThemeById(themeId: string) {
   activeUiTheme.value = result.theme
   syncThemeExportName()
   themeFeedbackMessage.value = `已切换系统主题：${result.theme.meta.name}`
-}
-
-function handleBuiltinThemeChange(event: Event) {
-  const target = event.target as HTMLSelectElement | null
-  if (!target) {
-    return
-  }
-
-  selectedBuiltinThemeId.value = target.value
-  applyBuiltinThemeById(target.value)
 }
 
 function handleThemeExportNameBlur() {
@@ -1161,12 +1198,12 @@ onBeforeUnmount(() => {
             class="settings-tab-panel settings-theme-tab-panel"
             data-testid="settings-panel-themes"
           >
-            <p>管理全局主题文件。你可以导出当前主题、导入 JSON 主题并实时应用。</p>
+            <p>全局主题实验室：挑选高辨识度视觉方向，实时应用，并可继续导入/导出 JSON 做深度定制。</p>
 
             <article class="theme-settings" data-testid="settings-theme-panel">
               <header class="theme-settings-head">
                 <div>
-                  <h4>全局玻璃主题</h4>
+                  <h4>全局主题实验室</h4>
                   <p data-testid="settings-theme-current-name">
                     {{ currentThemeMetaText }}
                   </p>
@@ -1176,24 +1213,36 @@ onBeforeUnmount(() => {
                 </code>
               </header>
 
-              <label class="theme-preset-selector">
-                <span>系统预置主题（9 套）</span>
-                <div class="theme-preset-actions">
-                  <select
-                    :value="selectedBuiltinThemeId"
-                    data-testid="settings-theme-preset-select"
-                    @change="handleBuiltinThemeChange"
-                  >
-                    <option
-                      v-for="theme in builtinThemeOptions"
-                      :key="theme.id"
-                      :value="theme.id"
-                    >
-                      {{ theme.name }}
-                    </option>
-                  </select>
-                </div>
-              </label>
+              <section class="theme-gallery" data-testid="settings-theme-gallery">
+                <button
+                  v-for="theme in builtinThemeCards"
+                  :key="theme.id"
+                  type="button"
+                  class="theme-card"
+                  :class="{ active: selectedBuiltinThemeId === theme.id }"
+                  data-testid="settings-theme-card"
+                  :data-theme-id="theme.id"
+                  :aria-pressed="selectedBuiltinThemeId === theme.id"
+                  @click="applyBuiltinThemeById(theme.id)"
+                  @keydown.enter.prevent="applyBuiltinThemeById(theme.id)"
+                  @keydown.space.prevent="applyBuiltinThemeById(theme.id)"
+                >
+                  <span class="theme-card-head">
+                    <strong>{{ theme.name }}</strong>
+                    <code>{{ theme.id }}</code>
+                  </span>
+                  <span class="theme-card-font">{{ theme.fontLabel }}</span>
+                  <span class="theme-card-swatches" aria-hidden="true">
+                    <span
+                      v-for="(swatch, index) in theme.swatches"
+                      :key="`${theme.id}-${index}`"
+                      class="theme-card-swatch"
+                      :style="{ background: swatch }"
+                    />
+                  </span>
+                  <span class="theme-card-description">{{ theme.description }}</span>
+                </button>
+              </section>
 
               <label class="theme-export-name">
                 <span>导出文件名</span>
@@ -1242,66 +1291,71 @@ onBeforeUnmount(() => {
                 >
               </div>
 
-              <section class="theme-tutorial" data-testid="settings-theme-tutorial">
-                <h5>主题编写教程</h5>
-                <p>主题文件采用模块化结构：`schemaVersion + meta + modules`。</p>
+              <details class="theme-tutorial-collapse">
+                <summary data-testid="settings-theme-tutorial-toggle">
+                  主题编写教程（展开查看完整规范）
+                </summary>
+                <section class="theme-tutorial" data-testid="settings-theme-tutorial">
+                  <h5>主题编写教程</h5>
+                  <p>主题文件采用模块化结构：`schemaVersion + meta + modules`。</p>
 
-                <div class="theme-tutorial-section">
-                  <h6>文件结构模板</h6>
-                  <pre class="theme-tutorial-code"><code>{{ themeTutorialJsonTemplate }}</code></pre>
-                </div>
+                  <div class="theme-tutorial-section">
+                    <h6>文件结构模板</h6>
+                    <pre class="theme-tutorial-code"><code>{{ themeTutorialJsonTemplate }}</code></pre>
+                  </div>
 
-                <div class="theme-tutorial-section">
-                  <h6>模块职责</h6>
-                  <ul class="theme-tutorial-list">
-                    <li
-                      v-for="item in themeTutorialModules"
-                      :key="item.id"
-                    >
-                      <strong>{{ item.id }}</strong>
-                      <span>{{ item.description }}</span>
-                      <code>{{ item.tokenExample }}</code>
-                    </li>
-                  </ul>
-                </div>
+                  <div class="theme-tutorial-section">
+                    <h6>模块职责</h6>
+                    <ul class="theme-tutorial-list">
+                      <li
+                        v-for="item in themeTutorialModules"
+                        :key="item.id"
+                      >
+                        <strong>{{ item.id }}</strong>
+                        <span>{{ item.description }}</span>
+                        <code>{{ item.tokenExample }}</code>
+                      </li>
+                    </ul>
+                  </div>
 
-                <div class="theme-tutorial-section">
-                  <h6>浮动工具栏关键 token（支持导入/导出）</h6>
-                  <ul class="theme-tutorial-list">
-                    <li
-                      v-for="item in themeToolbarTokenHighlights"
-                      :key="item.token"
-                    >
-                      <code>{{ item.token }}</code>
-                      <span>{{ item.description }}</span>
-                    </li>
-                  </ul>
-                </div>
+                  <div class="theme-tutorial-section">
+                    <h6>浮动工具栏关键字段（支持导入/导出）</h6>
+                    <ul class="theme-tutorial-list">
+                      <li
+                        v-for="item in themeToolbarTokenHighlights"
+                        :key="item.token"
+                      >
+                        <code>{{ item.token }}</code>
+                        <span>{{ item.description }}</span>
+                      </li>
+                    </ul>
+                  </div>
 
-                <div class="theme-tutorial-section">
-                  <h6>推荐编写步骤</h6>
-                  <ol class="theme-tutorial-steps">
-                    <li
-                      v-for="step in themeTutorialSteps"
-                      :key="step"
-                    >
-                      {{ step }}
-                    </li>
-                  </ol>
-                </div>
+                  <div class="theme-tutorial-section">
+                    <h6>推荐编写步骤</h6>
+                    <ol class="theme-tutorial-steps">
+                      <li
+                        v-for="step in themeTutorialSteps"
+                        :key="step"
+                      >
+                        {{ step }}
+                      </li>
+                    </ol>
+                  </div>
 
-                <div class="theme-tutorial-section">
-                  <h6>编写约束</h6>
-                  <ul class="theme-tutorial-list">
-                    <li
-                      v-for="rule in themeTutorialRules"
-                      :key="rule"
-                    >
-                      {{ rule }}
-                    </li>
-                  </ul>
-                </div>
-              </section>
+                  <div class="theme-tutorial-section">
+                    <h6>编写约束</h6>
+                    <ul class="theme-tutorial-list">
+                      <li
+                        v-for="rule in themeTutorialRules"
+                        :key="rule"
+                      >
+                        {{ rule }}
+                      </li>
+                    </ul>
+                  </div>
+                </section>
+              </details>
 
               <p
                 v-if="themeFeedbackMessage"
@@ -1834,13 +1888,138 @@ h2 {
 .theme-settings {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   min-height: 0;
-  border: 1px solid var(--theme-surface-glass-panel-border);
+  border: 1px solid var(--theme-surface-toolbar-glass-border);
+  border-radius: 16px;
+  padding: 12px;
+  backdrop-filter: var(--theme-surface-toolbar-glass-backdrop-filter);
+  background: var(--theme-surface-toolbar-glass-tint-overlay), var(--theme-surface-glass-card-background);
+  box-shadow: var(--theme-surface-toolbar-glass-shadow);
+  overflow: hidden;
+}
+
+.theme-gallery {
+  min-height: 260px;
+  flex: 1 1 260px;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(188px, 1fr));
+  gap: 10px;
+  padding-right: 2px;
+}
+
+.theme-settings:has(.theme-tutorial-collapse[open]) .theme-gallery {
+  min-height: 150px;
+  flex-basis: 150px;
+}
+
+.theme-tutorial-collapse {
+  border: 1px solid var(--theme-surface-input-border);
+  border-radius: 10px;
+  background: var(--theme-surface-glass-card-background);
+}
+
+.theme-tutorial-collapse > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 9px 10px;
+  color: var(--theme-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.theme-tutorial-collapse > summary::-webkit-details-marker {
+  display: none;
+}
+
+.theme-tutorial-collapse[open] > summary {
+  border-bottom: 1px solid var(--theme-surface-input-border);
+}
+
+.theme-card {
+  border: 1px solid var(--theme-surface-input-border);
+  background: var(--theme-surface-glass-tile-background);
+  color: var(--theme-text-primary);
   border-radius: 12px;
   padding: 10px;
-  background: var(--theme-surface-glass-card-background);
+  display: grid;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    background 180ms ease;
+}
+
+.theme-card:hover {
+  border-color: var(--theme-accent-row-action-border);
+  transform: translateY(-1px);
   box-shadow: var(--theme-surface-glass-panel-shadow);
+}
+
+.theme-card.active {
+  border-color: var(--theme-accent-selected-border);
+  background: var(--theme-accent-selected-background);
+  box-shadow: var(--theme-surface-glass-panel-shadow);
+}
+
+.theme-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.theme-card-head strong {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.theme-card-head code {
+  font-size: 10px;
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: var(--theme-surface-code-tag-background);
+}
+
+.theme-card-font {
+  color: var(--theme-text-tertiary);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+}
+
+.theme-card-swatches {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.theme-card-swatch {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--theme-surface-input-border) 64%, transparent);
+}
+
+.theme-card-description {
+  color: var(--theme-text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.theme-card:focus-visible,
+.theme-tutorial-collapse > summary:focus-visible,
+.theme-export-name input:focus-visible,
+.theme-action:focus-visible,
+.settings-tab-button:focus-visible,
+.language-panel-head input:focus-visible {
+  outline: 2px solid var(--theme-accent-focus-border);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px var(--theme-accent-focus-ring);
 }
 
 .theme-settings-head {
@@ -1853,7 +2032,8 @@ h2 {
 .theme-settings-head h4 {
   margin: 0;
   color: var(--theme-text-primary);
-  font-size: 15px;
+  font-size: 16px;
+  letter-spacing: 0.02em;
 }
 
 .theme-settings-head p {
@@ -1865,9 +2045,9 @@ h2 {
 .theme-settings-head code {
   color: var(--theme-text-primary);
   background: var(--theme-surface-code-tag-background);
-  border-radius: 7px;
-  padding: 3px 7px;
-  font-size: 12px;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 11px;
 }
 
 .theme-export-name {
@@ -1875,45 +2055,18 @@ h2 {
   gap: 6px;
 }
 
-.theme-preset-selector {
-  display: grid;
-  gap: 6px;
-}
-
-.theme-preset-selector span {
-  color: var(--theme-text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.theme-preset-actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-}
-
-.theme-preset-actions select {
-  border: 1px solid var(--theme-surface-input-border);
-  background: var(--theme-surface-input-background);
-  color: var(--theme-text-primary);
-  border-radius: 8px;
-  padding: 7px 9px;
-  font-size: 13px;
-  min-width: 0;
-}
-
 .theme-export-name span {
   color: var(--theme-text-secondary);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .theme-export-name input {
   border: 1px solid var(--theme-surface-input-border);
   background: var(--theme-surface-input-background);
   color: var(--theme-text-primary);
-  border-radius: 8px;
-  padding: 7px 9px;
+  border-radius: 9px;
+  padding: 8px 10px;
   font-size: 13px;
 }
 
@@ -1928,11 +2081,20 @@ h2 {
   border: 1px solid var(--theme-accent-action-button-border);
   background: var(--theme-surface-neutral-button-background);
   color: var(--theme-text-primary);
-  border-radius: 8px;
-  padding: 6px 10px;
+  border-radius: 9px;
+  padding: 7px 11px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
+  transition:
+    border-color 170ms ease,
+    background 170ms ease,
+    transform 170ms ease;
+}
+
+.theme-action:hover {
+  border-color: var(--theme-accent-row-action-border);
+  transform: translateY(-1px);
 }
 
 .theme-action.primary {
@@ -1950,15 +2112,16 @@ h2 {
 }
 
 .theme-tutorial {
-  border: 1px solid var(--theme-surface-input-border);
-  border-radius: 10px;
-  background: var(--theme-surface-glass-card-background);
+  border: 0;
+  border-radius: 0 0 10px 10px;
+  background: transparent;
   padding: 10px;
   display: grid;
   gap: 10px;
   min-height: 0;
   overflow: auto;
-  flex: 1 1 auto;
+  max-height: min(40vh, 340px);
+  scrollbar-gutter: stable both-edges;
 }
 
 .theme-tutorial h5,
@@ -2041,6 +2204,14 @@ h2 {
   color: var(--theme-text-secondary);
   font-size: 12px;
   font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-card,
+  .theme-action,
+  .workspace-tile {
+    transition: none;
+  }
 }
 
 .settings-shortcuts-tab-panel {
@@ -2516,8 +2687,9 @@ h2 {
     flex-direction: column;
   }
 
-  .theme-preset-actions {
-    grid-template-columns: 1fr;
+  .theme-gallery {
+    min-height: 220px;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   }
 }
 </style>

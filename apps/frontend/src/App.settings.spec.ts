@@ -94,9 +94,10 @@ describe('Settings page', () => {
       expect(wrapper.find('[data-testid="settings-theme-panel"]').exists()).toBe(true)
     })
 
-    const presetSelect = wrapper.get('[data-testid="settings-theme-preset-select"]')
-    expect((presetSelect.element as HTMLSelectElement).options.length).toBeGreaterThanOrEqual(9)
-    await presetSelect.setValue('graphite-pro')
+    const graphiteCard = wrapper.get(
+      '[data-testid="settings-theme-card"][data-theme-id="graphite-pro"]',
+    )
+    await graphiteCard.trigger('click')
     expect(wrapper.get('[data-testid="settings-theme-current-id"]').text()).toBe('graphite-pro')
 
     const fileNameInput = wrapper.get('[data-testid="settings-theme-export-name"]')
@@ -143,6 +144,43 @@ describe('Settings page', () => {
     expect(document.documentElement.style.getPropertyValue('--theme-layout-app-shell-background')).toBe(
       'linear-gradient(160deg, #fee2e2 0%, #fecaca 52%, #fda4af 100%)',
     )
+  })
+
+  it('renders theme lab gallery cards and supports quick apply', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+
+    const wrapper = mount(SettingsPage, {
+      global: {
+        plugins: [pinia],
+      },
+    })
+
+    await wrapper.get('[data-testid="settings-tab-themes"]').trigger('click')
+    await vi.waitFor(() => {
+      expect(wrapper.find('[data-testid="settings-theme-panel"]').exists()).toBe(true)
+    })
+
+    const cards = wrapper.findAll('[data-testid="settings-theme-card"]')
+    expect(cards.length).toBeGreaterThanOrEqual(17)
+
+    const graphiteCard = wrapper.get(
+      '[data-testid="settings-theme-card"][data-theme-id="graphite-pro"]',
+    )
+    await graphiteCard.trigger('click')
+    expect(wrapper.get('[data-testid="settings-theme-current-id"]').text()).toBe('graphite-pro')
+
+    const auroraCard = wrapper.get(
+      '[data-testid="settings-theme-card"][data-theme-id="aurora-night"]',
+    )
+    await auroraCard.trigger('keydown', { key: 'Enter' })
+    expect(wrapper.get('[data-testid="settings-theme-current-id"]').text()).toBe('aurora-night')
+
+    const inkWashCard = wrapper.get(
+      '[data-testid="settings-theme-card"][data-theme-id="ink-wash-zen"]',
+    )
+    await inkWashCard.trigger('keydown', { key: ' ' })
+    expect(wrapper.get('[data-testid="settings-theme-current-id"]').text()).toBe('ink-wash-zen')
   })
 
   it('shows actionable error when toolbar theme tokens are missing on import', async () => {

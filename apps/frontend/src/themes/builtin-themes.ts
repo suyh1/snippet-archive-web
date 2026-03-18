@@ -1,6 +1,14 @@
+import acidRushTheme from './presets/acid-rush.theme.json'
 import auroraNightTheme from './presets/aurora-night.theme.json'
+import biomeLightTheme from './presets/biome-light.theme.json'
+import brutalSignalTheme from './presets/brutal-signal.theme.json'
+import cobaltFluxTheme from './presets/cobalt-flux.theme.json'
+import decoCircuitTheme from './presets/deco-circuit.theme.json'
+import editorialNoirTheme from './presets/editorial-noir.theme.json'
 import forestGlassTheme from './presets/forest-glass.theme.json'
 import graphiteProTheme from './presets/graphite-pro.theme.json'
+import inkWashZenTheme from './presets/ink-wash-zen.theme.json'
+import lavaForgeTheme from './presets/lava-forge.theme.json'
 import monoMinimalTheme from './presets/mono-minimal.theme.json'
 import nordicFogTheme from './presets/nordic-fog.theme.json'
 import paperInkTheme from './presets/paper-ink.theme.json'
@@ -11,6 +19,14 @@ import { cloneTheme, type UiThemeFile } from './theme-schema'
 
 const builtinThemesRaw = [
   glassGradientTheme,
+  acidRushTheme,
+  editorialNoirTheme,
+  brutalSignalTheme,
+  biomeLightTheme,
+  decoCircuitTheme,
+  cobaltFluxTheme,
+  lavaForgeTheme,
+  inkWashZenTheme,
   nordicFogTheme,
   graphiteProTheme,
   tokyoNeonTheme,

@@ -3,15 +3,15 @@
   "meta": {
     "id": "graphite-pro",
     "name": "Graphite Pro",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "author": "Snippet Archive",
-    "description": "High-contrast professional dark theme with graphite surfaces."
+    "description": "石墨专业主题，深色基底强化信息密度和稳定感。"
   },
   "modules": {
     "layout": {
-      "appFontFamily": "'Manrope', 'Plus Jakarta Sans', 'Avenir Next', sans-serif",
+      "appFontFamily": "'DM Sans', 'Space Grotesk', 'Noto Sans SC', sans-serif",
       "bodyBackground": "linear-gradient(180deg, #0d1117 0%, #151b23 100%)",
-      "appShellBackground": "radial-gradient(circle at 16% 8%, rgba(59, 130, 246, 0.18), transparent 38%), radial-gradient(circle at 84% 0%, rgba(99, 102, 241, 0.16), transparent 36%), radial-gradient(circle at 48% 100%, rgba(30, 41, 59, 0.42), transparent 52%), linear-gradient(160deg, #0b1018 0%, #121926 50%, #151d2a 100%)",
+      "appShellBackground": "radial-gradient(circle at 14% 8%, rgba(59, 130, 246, 0.24), transparent 38%), radial-gradient(circle at 84% 0%, rgba(129, 140, 248, 0.22), transparent 34%), radial-gradient(circle at 50% 100%, rgba(30, 41, 59, 0.44), transparent 50%), linear-gradient(160deg, #090f18 0%, #121926 50%, #171f2c 100%)",
       "sidebarBackground": "linear-gradient(180deg, rgba(2, 6, 23, 0.98), rgba(15, 23, 42, 0.96))",
       "sidebarText": "#e5e7eb",
       "sidebarBorder": "rgba(71, 85, 105, 0.45)"
@@ -60,7 +60,7 @@
       "toastBorder": "rgba(100, 116, 139, 0.44)",
       "toastShadow": "0 18px 32px rgba(2, 6, 23, 0.5)",
       "toolbarGlassBorder": "rgba(108, 129, 162, 0.42)",
-      "toolbarGlassBackground": "radial-gradient(126% 184% at 10% -30%, rgba(71, 126, 216, 0.26) 0%, rgba(71, 126, 216, 0) 54%), radial-gradient(132% 188% at 90% -46%, rgba(134, 122, 245, 0.24) 0%, rgba(134, 122, 245, 0) 56%), var(--theme-surface-glass-header-background)",
+      "toolbarGlassBackground": "radial-gradient(128% 186% at 10% -30%, rgba(71, 126, 216, 0.3) 0%, rgba(71, 126, 216, 0) 54%), radial-gradient(134% 192% at 90% -46%, rgba(134, 122, 245, 0.28) 0%, rgba(134, 122, 245, 0) 56%), radial-gradient(120% 152% at 52% 122%, rgba(99, 102, 241, 0.18) 0%, rgba(99, 102, 241, 0) 58%), var(--theme-surface-glass-header-background)",
       "toolbarGlassBackdropFilter": "blur(25px) saturate(1.4) contrast(1.1)",
       "toolbarGlassShadow": "0 22px 46px rgba(1, 5, 16, 0.58), 0 8px 20px rgba(24, 68, 136, 0.34), inset 0 1px 0 rgba(188, 212, 248, 0.24), inset 0 -1px 0 rgba(68, 88, 124, 0.34)",
       "toolbarGlassHighlightArc": "radial-gradient(104% 94% at 50% 100%, rgba(219, 231, 250, 0.36) 0%, rgba(219, 231, 250, 0.14) 36%, rgba(219, 231, 250, 0.05) 56%, rgba(219, 231, 250, 0) 74%)",
@@ -80,7 +80,7 @@
       "toolbarCaptureBackground": "var(--theme-accent-primary-button-gradient)"
     },
     "accent": {
-      "primaryButtonGradient": "linear-gradient(130deg, rgba(59, 130, 246, 0.9), rgba(99, 102, 241, 0.84))",
+      "primaryButtonGradient": "linear-gradient(132deg, rgba(59, 130, 246, 0.94), rgba(99, 102, 241, 0.86))",
       "primaryButtonBorder": "rgba(96, 165, 250, 0.62)",
       "primaryButtonText": "#e2e8f0",
       "actionButtonBorder": "rgba(100, 116, 139, 0.62)",

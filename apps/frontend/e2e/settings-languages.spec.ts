@@ -13,6 +13,9 @@ async function readSettingsLayoutMetrics(page: Parameters<typeof test>[0]['page'
     const themeSettings = document.querySelector('[data-testid="settings-theme-panel"]') as
       | HTMLElement
       | null
+    const themeGallery = document.querySelector('[data-testid="settings-theme-gallery"]') as
+      | HTMLElement
+      | null
     const tutorial = document.querySelector('[data-testid="settings-theme-tutorial"]') as
       | HTMLElement
       | null
@@ -39,6 +42,8 @@ async function readSettingsLayoutMetrics(page: Parameters<typeof test>[0]['page'
       activeTabPanelBottom: activeTabPanel?.getBoundingClientRect().bottom ?? 0,
       panelContentBottom,
       themeSettingsBottom: themeSettings?.getBoundingClientRect().bottom ?? 0,
+      themeGalleryBottom: themeGallery?.getBoundingClientRect().bottom ?? 0,
+      themeGalleryClientHeight: themeGallery?.clientHeight ?? 0,
       tutorialBottom: tutorial?.getBoundingClientRect().bottom ?? 0,
     }
   })
@@ -216,6 +221,9 @@ test('settings page shows language list and supports tab switching', async ({ pa
 
   await page.getByTestId('settings-tab-themes').click()
   await expect(page.getByTestId('settings-panel-themes')).toBeVisible()
+  const tutorialToggle = page.getByTestId('settings-theme-tutorial-toggle')
+  await expect(tutorialToggle).toBeVisible()
+  await tutorialToggle.click()
   const themeTutorial = page.getByTestId('settings-theme-tutorial')
   await expect(themeTutorial).toBeVisible()
   await expect(themeTutorial).toContainText('schemaVersion')
@@ -273,8 +281,11 @@ test('settings themes tutorial stays contained and is scrollable', async ({ page
   expect(Math.abs(denseStateLayout.settingsViewBottom - denseStateLayout.contentInnerBottom)).toBeLessThanOrEqual(2)
   expect(Math.abs(denseStateLayout.activeTabPanelBottom - denseStateLayout.panelContentBottom)).toBeLessThanOrEqual(2)
   expect(denseStateLayout.themeSettingsBottom).toBeLessThanOrEqual(denseStateLayout.panelContentBottom + 2)
-  expect(denseStateLayout.tutorialBottom).toBeLessThanOrEqual(denseStateLayout.panelContentBottom + 2)
+  expect(denseStateLayout.themeGalleryBottom).toBeLessThanOrEqual(denseStateLayout.panelContentBottom + 2)
+  expect(denseStateLayout.themeGalleryClientHeight).toBeGreaterThanOrEqual(260)
 
+  await page.getByTestId('settings-theme-tutorial-toggle').click()
+  await expect(page.getByTestId('settings-theme-tutorial')).toBeVisible()
   const tutorialScroll = await page.getByTestId('settings-theme-tutorial').evaluate((node) => {
     const element = node as HTMLElement
     element.scrollTop = 0
@@ -300,12 +311,12 @@ test('settings themes tab supports import/export and keyboard flows', async ({ p
   await expect(page.getByTestId('settings-theme-panel')).toBeVisible()
   await expect(page.getByTestId('settings-theme-current-id')).toContainText('glass-gradient')
 
-  await expect(page.getByTestId('settings-theme-preset-select')).toBeVisible()
-  await page.getByTestId('settings-theme-preset-select').selectOption('graphite-pro')
+  await page.locator('[data-testid="settings-theme-card"][data-theme-id="graphite-pro"]').click()
   await expect(page.getByTestId('settings-theme-current-id')).toContainText('graphite-pro')
 
-  const presetSelect = page.getByTestId('settings-theme-preset-select')
-  await presetSelect.selectOption('nordic-fog')
+  const nordicCard = page.locator('[data-testid="settings-theme-card"][data-theme-id="nordic-fog"]')
+  await nordicCard.focus()
+  await page.keyboard.press('Enter')
   await expect(page.getByTestId('settings-theme-current-id')).toContainText('nordic-fog')
 
   const exportNameInput = page.getByTestId('settings-theme-export-name')
@@ -386,6 +397,14 @@ test('themes tab can cycle all built-in presets and apply immediately', async ({
 
   const presetIds = [
     'glass-gradient',
+    'acid-rush',
+    'editorial-noir',
+    'brutal-signal',
+    'biome-light',
+    'deco-circuit',
+    'cobalt-flux',
+    'lava-forge',
+    'ink-wash-zen',
     'nordic-fog',
     'graphite-pro',
     'tokyo-neon',
@@ -399,7 +418,7 @@ test('themes tab can cycle all built-in presets and apply immediately', async ({
   let previousShellBackground = ''
   let previousToolbarBackground = ''
   for (const presetId of presetIds) {
-    await page.getByTestId('settings-theme-preset-select').selectOption(presetId)
+    await page.locator(`[data-testid="settings-theme-card"][data-theme-id="${presetId}"]`).click()
     await expect(page.getByTestId('settings-theme-current-id')).toContainText(presetId)
 
     const appliedState = await page.evaluate(() => {

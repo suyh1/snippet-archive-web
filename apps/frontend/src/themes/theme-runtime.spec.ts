@@ -57,7 +57,8 @@ describe('theme runtime', () => {
   it('switches among builtin themes and keeps catalog complete', () => {
     initializeUiTheme()
     const catalog = getBuiltinUiThemeCatalog()
-    expect(catalog.length).toBeGreaterThanOrEqual(9)
+    expect(catalog.length).toBeGreaterThanOrEqual(17)
+    expect(catalog.some((item) => item.id === 'ink-wash-zen')).toBe(true)
 
     const switched = applyBuiltinUiTheme('graphite-pro')
     expect(switched.ok).toBe(true)
@@ -81,6 +82,28 @@ describe('theme runtime', () => {
 
     expect(new Set(toolbarBackgrounds).size).toBe(themes.length)
     expect(new Set(toolbarShadows).size).toBe(themes.length)
+  })
+
+  it('keeps legacy preset typography visually diverse after theme refresh', () => {
+    const themes = getBuiltinUiThemeFiles()
+    const legacyPresetIds = [
+      'glass-gradient',
+      'nordic-fog',
+      'graphite-pro',
+      'tokyo-neon',
+      'paper-ink',
+      'forest-glass',
+      'sunset-ui',
+      'mono-minimal',
+      'aurora-night',
+    ]
+
+    const legacyFonts = themes
+      .filter((theme) => legacyPresetIds.includes(theme.meta.id))
+      .map((theme) => theme.modules.layout.appFontFamily)
+
+    expect(legacyFonts).toHaveLength(legacyPresetIds.length)
+    expect(new Set(legacyFonts).size).toBeGreaterThanOrEqual(6)
   })
 
   it('rejects invalid theme file and keeps current theme', async () => {
