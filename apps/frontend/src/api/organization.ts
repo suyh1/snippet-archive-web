@@ -37,6 +37,11 @@ export const organizationApi = {
       body: JSON.stringify(payload),
     })
   },
+  deleteOrganization(organizationId: string) {
+    return apiRequest<{ id: string }>(`/organizations/${organizationId}`, {
+      method: 'DELETE',
+    })
+  },
   listMembers(organizationId: string) {
     return apiRequest<{ items: OrganizationMember[] }>(
       `/organizations/${organizationId}/members`,

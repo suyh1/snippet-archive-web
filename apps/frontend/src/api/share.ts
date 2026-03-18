@@ -1,7 +1,7 @@
 import { apiRequest } from './http'
 
 export type ShareVisibility = 'PRIVATE' | 'TEAM' | 'PUBLIC'
-export type SharePermission = 'READ'
+export type SharePermission = 'READ' | 'READ_METADATA'
 
 export type ShareLink = {
   id: string

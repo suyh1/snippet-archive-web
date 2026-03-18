@@ -2,15 +2,23 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { auditApi, type AuditLogItem } from '@/api/audit'
 import { authApi, type AuthUser } from '@/api/auth'
+import ConfirmDialog from '@/features/workspace/ConfirmDialog.vue'
 import {
   organizationApi,
   type Organization,
   type OrganizationMember,
   type OrganizationRole,
 } from '@/api/organization'
-import { shareApi, type ShareLink, type ShareVisibility } from '@/api/share'
+import {
+  shareApi,
+  type ShareLink,
+  type SharePermission,
+  type ShareVisibility,
+} from '@/api/share'
+import { workspaceApi } from '@/api/workspaces'
 import { getAuthToken, setAuthToken } from '@/api/http'
 import { resolveWorkspaceErrorMessage } from '@/utils/error-message'
+import type { Workspace, WorkspaceFile } from '@/types/workspace'
 
 const bootLoading = ref(true)
 const working = ref(false)
@@ -26,18 +34,28 @@ const organizations = ref<Organization[]>([])
 const selectedOrganizationId = ref('')
 const organizationName = ref('')
 const organizationSlug = ref('')
+const organizationPendingDelete = ref<Organization | null>(null)
 
 const members = ref<OrganizationMember[]>([])
 const inviteEmail = ref('')
 const inviteRole = ref<OrganizationRole>('VIEWER')
+const memberRoleDrafts = ref<Record<string, OrganizationRole>>({})
+const memberPendingRemove = ref<OrganizationMember | null>(null)
 
 const shareWorkspaceId = ref('')
 const shareFileId = ref('')
 const shareVisibility = ref<ShareVisibility>('PUBLIC')
+const sharePermission = ref<SharePermission>('READ')
 const shareExpiry = ref('')
+const shareManualMode = ref(false)
+const shareWorkspaceOptions = ref<Workspace[]>([])
+const shareFileOptions = ref<WorkspaceFile[]>([])
 const shareLinks = ref<ShareLink[]>([])
 
 const auditAction = ref('')
+const auditActorId = ref('')
+const auditFrom = ref('')
+const auditTo = ref('')
 const auditLogs = ref<AuditLogItem[]>([])
 
 const canSubmitAuth = computed(() => {
@@ -56,8 +74,11 @@ const canCreateOrganization = computed(() => {
 })
 
 const canCreateShareLink = computed(() => {
+  const workspaceId = shareWorkspaceId.value.trim()
+  const fileId = shareFileId.value.trim()
+
   return (
-    shareWorkspaceId.value.trim().length > 0 && shareFileId.value.trim().length > 0
+    workspaceId.length > 0 && fileId.length > 0
   )
 })
 
@@ -113,6 +134,14 @@ function currentOrganization() {
   return organizations.value.find((item) => item.id === selectedOrganizationId.value) ?? null
 }
 
+function syncMemberRoleDrafts(nextMembers: OrganizationMember[]) {
+  const drafts: Record<string, OrganizationRole> = {}
+  for (const item of nextMembers) {
+    drafts[item.id] = item.role
+  }
+  memberRoleDrafts.value = drafts
+}
+
 async function loadOrganizations() {
   const items = await organizationApi.listOrganizations()
   organizations.value = items
@@ -132,10 +161,15 @@ async function loadOrganizations() {
 async function loadMembers() {
   if (!selectedOrganizationId.value) {
     members.value = []
+    memberRoleDrafts.value = {}
+    memberPendingRemove.value = null
     return
   }
 
-  members.value = await organizationApi.listMembers(selectedOrganizationId.value)
+  const items = await organizationApi.listMembers(selectedOrganizationId.value)
+  members.value = items
+  syncMemberRoleDrafts(items)
+  memberPendingRemove.value = null
 }
 
 async function loadAuditLogs() {
@@ -146,6 +180,9 @@ async function loadAuditLogs() {
 
   const data = await auditApi.listOrganizationAuditLogs(selectedOrganizationId.value, {
     action: auditAction.value.trim() || undefined,
+    actorId: auditActorId.value.trim() || undefined,
+    from: expiryToIso(auditFrom.value),
+    to: expiryToIso(auditTo.value),
     page: 1,
     pageSize: 20,
   })
@@ -162,6 +199,99 @@ async function loadShareLinks() {
     shareWorkspaceId.value.trim(),
     shareFileId.value.trim(),
   )
+}
+
+async function loadShareWorkspaceOptions() {
+  if (!selectedOrganizationId.value) {
+    shareWorkspaceOptions.value = []
+    shareFileOptions.value = []
+    if (!shareManualMode.value) {
+      shareWorkspaceId.value = ''
+      shareFileId.value = ''
+    }
+    return
+  }
+
+  const allWorkspaces = await workspaceApi.list()
+  const scoped = allWorkspaces.filter((workspace) => {
+    return workspace.organizationId === selectedOrganizationId.value
+  })
+  shareWorkspaceOptions.value = scoped
+
+  if (shareManualMode.value) {
+    return
+  }
+
+  if (!scoped.some((workspace) => workspace.id === shareWorkspaceId.value)) {
+    shareWorkspaceId.value = ''
+    shareFileId.value = ''
+  }
+
+  await loadShareFileOptions()
+}
+
+async function loadShareFileOptions() {
+  if (!shareWorkspaceId.value.trim()) {
+    shareFileOptions.value = []
+    if (!shareManualMode.value) {
+      shareFileId.value = ''
+    }
+    return
+  }
+
+  const files = await workspaceApi.listFiles(shareWorkspaceId.value.trim())
+  const availableFiles = files.filter((file) => file.kind === 'file')
+  shareFileOptions.value = availableFiles
+
+  if (shareManualMode.value) {
+    return
+  }
+
+  if (!availableFiles.some((file) => file.id === shareFileId.value)) {
+    shareFileId.value = ''
+  }
+}
+
+function toggleShareManualMode() {
+  shareManualMode.value = !shareManualMode.value
+
+  if (!shareManualMode.value) {
+    if (!shareWorkspaceOptions.value.some((workspace) => workspace.id === shareWorkspaceId.value)) {
+      shareWorkspaceId.value = ''
+    }
+
+    void loadShareFileOptions()
+  }
+}
+
+async function onShareWorkspaceChange() {
+  if (shareManualMode.value) {
+    return
+  }
+
+  try {
+    await loadShareFileOptions()
+  } catch (error) {
+    setError(error, '加载文件候选失败，请稍后重试。')
+  }
+}
+
+async function refreshShareCandidates() {
+  if (!authUser.value || working.value) {
+    return
+  }
+
+  clearFeedback()
+  working.value = true
+
+  try {
+    await loadShareWorkspaceOptions()
+    message.value = '分享候选已刷新。'
+  } catch (error) {
+    setError(error, '刷新分享候选失败，请稍后重试。')
+  } finally {
+    working.value = false
+  }
 }
 
 async function register() {
@@ -232,6 +362,13 @@ async function logout() {
     auditLogs.value = []
     shareWorkspaceId.value = ''
     shareFileId.value = ''
+    shareManualMode.value = false
+    shareWorkspaceOptions.value = []
+    shareFileOptions.value = []
+    auditAction.value = ''
+    auditActorId.value = ''
+    auditFrom.value = ''
+    auditTo.value = ''
     setAuthToken(null)
     working.value = false
   }
@@ -264,6 +401,59 @@ async function createOrganization() {
   }
 }
 
+function requestDeleteOrganization() {
+  if (working.value) {
+    return
+  }
+
+  const organization = currentOrganization()
+  if (!organization || organization.currentUserRole !== 'OWNER') {
+    return
+  }
+
+  clearFeedback()
+  memberPendingRemove.value = null
+  organizationPendingDelete.value = organization
+}
+
+function cancelDeleteOrganization() {
+  if (working.value) {
+    return
+  }
+
+  organizationPendingDelete.value = null
+}
+
+async function confirmDeleteOrganization() {
+  if (!organizationPendingDelete.value || working.value) {
+    return
+  }
+
+  clearFeedback()
+  working.value = true
+
+  const targetOrganization = organizationPendingDelete.value
+
+  try {
+    await organizationApi.deleteOrganization(targetOrganization.id)
+    organizationPendingDelete.value = null
+    shareWorkspaceId.value = ''
+    shareFileId.value = ''
+    shareLinks.value = []
+    shareWorkspaceOptions.value = []
+    shareFileOptions.value = []
+    await loadOrganizations()
+    await loadMembers()
+    await loadAuditLogs()
+    await loadShareWorkspaceOptions()
+    message.value = '组织已删除。'
+  } catch (error) {
+    setError(error, '删除组织失败，请稍后重试。')
+  } finally {
+    working.value = false
+  }
+}
+
 async function addMember() {
   if (!selectedOrganizationId.value || inviteEmail.value.trim().length === 0 || working.value) {
     return
@@ -278,11 +468,99 @@ async function addMember() {
       role: inviteRole.value,
     })
     members.value = [member, ...members.value.filter((item) => item.id !== member.id)]
+    syncMemberRoleDrafts(members.value)
     inviteEmail.value = ''
     await loadAuditLogs()
     message.value = '成员已加入组织。'
   } catch (error) {
     setError(error, '添加成员失败，请稍后重试。')
+  } finally {
+    working.value = false
+  }
+}
+
+async function updateMemberRole(memberId: string) {
+  if (!selectedOrganizationId.value || working.value) {
+    return
+  }
+
+  const current = members.value.find((item) => item.id === memberId)
+  const nextRole = memberRoleDrafts.value[memberId]
+  if (!current || !nextRole || nextRole === current.role) {
+    return
+  }
+
+  clearFeedback()
+  working.value = true
+
+  try {
+    const updated = await organizationApi.updateMemberRole(
+      selectedOrganizationId.value,
+      memberId,
+      {
+        role: nextRole,
+      },
+    )
+
+    members.value = members.value.map((item) => {
+      return item.id === updated.id ? updated : item
+    })
+    memberRoleDrafts.value = {
+      ...memberRoleDrafts.value,
+      [updated.id]: updated.role,
+    }
+    await loadAuditLogs()
+    message.value = '成员角色已更新。'
+  } catch (error) {
+    memberRoleDrafts.value = {
+      ...memberRoleDrafts.value,
+      [memberId]: current.role,
+    }
+    setError(error, '更新成员角色失败，请稍后重试。')
+  } finally {
+    working.value = false
+  }
+}
+
+function requestRemoveMember(member: OrganizationMember) {
+  if (working.value) {
+    return
+  }
+
+  clearFeedback()
+  organizationPendingDelete.value = null
+  memberPendingRemove.value = member
+}
+
+function cancelRemoveMember() {
+  if (working.value) {
+    return
+  }
+
+  memberPendingRemove.value = null
+}
+
+async function confirmRemoveMember() {
+  if (!selectedOrganizationId.value || !memberPendingRemove.value || working.value) {
+    return
+  }
+
+  clearFeedback()
+  working.value = true
+
+  const target = memberPendingRemove.value
+
+  try {
+    await organizationApi.removeMember(selectedOrganizationId.value, target.id)
+    members.value = members.value.filter((item) => item.id !== target.id)
+    const nextDrafts = { ...memberRoleDrafts.value }
+    delete nextDrafts[target.id]
+    memberRoleDrafts.value = nextDrafts
+    memberPendingRemove.value = null
+    await loadAuditLogs()
+    message.value = '成员已移除。'
+  } catch (error) {
+    setError(error, '移除成员失败，请稍后重试。')
   } finally {
     working.value = false
   }
@@ -302,7 +580,7 @@ async function createShareLink() {
       shareFileId.value.trim(),
       {
         visibility: shareVisibility.value,
-        permission: 'READ',
+        permission: sharePermission.value,
         expiresAt: expiryToIso(shareExpiry.value),
       },
     )
@@ -361,6 +639,22 @@ function onShareExpiryBlur() {
   shareExpiry.value = normalizeExpiryInput(shareExpiry.value)
 }
 
+function onShareWorkspaceIdBlur() {
+  shareWorkspaceId.value = shareWorkspaceId.value.trim()
+}
+
+function onShareFileIdBlur() {
+  shareFileId.value = shareFileId.value.trim()
+}
+
+function onAuditFromBlur() {
+  auditFrom.value = normalizeExpiryInput(auditFrom.value)
+}
+
+function onAuditToBlur() {
+  auditTo.value = normalizeExpiryInput(auditTo.value)
+}
+
 async function bootstrap() {
   bootLoading.value = true
 
@@ -390,6 +684,7 @@ watch(selectedOrganizationId, async () => {
   try {
     await loadMembers()
     await loadAuditLogs()
+    await loadShareWorkspaceOptions()
   } catch (error) {
     setError(error, '加载组织数据失败，请稍后重试。')
   }
@@ -553,6 +848,14 @@ onMounted(() => {
           >
             创建组织
           </button>
+          <button
+            data-testid="team-org-delete"
+            type="button"
+            :disabled="working || !currentOrganization() || currentOrganization()?.currentUserRole !== 'OWNER'"
+            @click="requestDeleteOrganization"
+          >
+            删除当前组织
+          </button>
         </div>
       </section>
 
@@ -601,33 +904,124 @@ onMounted(() => {
               <strong>{{ member.user.name }}</strong>
               <span>{{ member.user.email }}</span>
               <em>{{ member.role }}</em>
+              <div class="team-member-actions">
+                <label>
+                  角色调整
+                  <select
+                    data-testid="team-member-role-select"
+                    v-model="memberRoleDrafts[member.id]"
+                  >
+                    <option value="OWNER">OWNER</option>
+                    <option value="EDITOR">EDITOR</option>
+                    <option value="VIEWER">VIEWER</option>
+                  </select>
+                </label>
+                <button
+                  data-testid="team-member-role-save"
+                  type="button"
+                  :disabled="working || !memberRoleDrafts[member.id] || memberRoleDrafts[member.id] === member.role"
+                  @click="updateMemberRole(member.id)"
+                >
+                  更新角色
+                </button>
+                <button
+                  data-testid="team-member-remove"
+                  type="button"
+                  :disabled="working"
+                  @click="requestRemoveMember(member)"
+                >
+                  移除成员
+                </button>
+              </div>
             </li>
           </ul>
         </template>
       </section>
 
       <section class="team-card">
-        <h3>分享管理</h3>
+        <header class="team-card-head">
+          <h3>分享管理</h3>
+          <div class="team-inline-actions">
+            <button
+              data-testid="team-share-refresh"
+              type="button"
+              :disabled="working || !selectedOrganizationId"
+              @click="refreshShareCandidates"
+            >
+              刷新候选
+            </button>
+            <button
+              data-testid="team-share-toggle-manual"
+              type="button"
+              :disabled="working"
+              @click="toggleShareManualMode"
+            >
+              {{ shareManualMode ? '使用选择器' : '手动输入 ID' }}
+            </button>
+          </div>
+        </header>
+
         <div class="team-form-grid">
-          <label>
-            Workspace ID
-            <input
-              data-testid="team-share-workspace-id"
-              v-model="shareWorkspaceId"
-              type="text"
-              placeholder="输入 workspace UUID"
-            />
-          </label>
-          <label>
-            File ID
-            <input
-              data-testid="team-share-file-id"
-              v-model="shareFileId"
-              type="text"
-              placeholder="输入 file UUID"
-              @keydown.enter.prevent="createShareLink"
-            />
-          </label>
+          <template v-if="!shareManualMode">
+            <label>
+              工作区
+              <select
+                data-testid="team-share-workspace-select"
+                v-model="shareWorkspaceId"
+                @change="onShareWorkspaceChange"
+              >
+                <option value="">请选择工作区</option>
+                <option
+                  v-for="workspace in shareWorkspaceOptions"
+                  :key="workspace.id"
+                  :value="workspace.id"
+                >
+                  {{ workspace.title }}
+                </option>
+              </select>
+            </label>
+            <label>
+              文件
+              <select
+                data-testid="team-share-file-select"
+                v-model="shareFileId"
+                :disabled="!shareWorkspaceId"
+                @keydown.enter.prevent="createShareLink"
+              >
+                <option value="">请选择文件</option>
+                <option
+                  v-for="file in shareFileOptions"
+                  :key="file.id"
+                  :value="file.id"
+                >
+                  {{ file.name }}（{{ file.path }}）
+                </option>
+              </select>
+            </label>
+          </template>
+          <template v-else>
+            <label>
+              Workspace ID
+              <input
+                data-testid="team-share-workspace-id"
+                v-model="shareWorkspaceId"
+                type="text"
+                placeholder="输入 workspace UUID"
+                @blur="onShareWorkspaceIdBlur"
+              />
+            </label>
+            <label>
+              File ID
+              <input
+                data-testid="team-share-file-id"
+                v-model="shareFileId"
+                type="text"
+                placeholder="输入 file UUID"
+                @blur="onShareFileIdBlur"
+                @keydown.enter.prevent="createShareLink"
+              />
+            </label>
+          </template>
           <label>
             可见性
             <select
@@ -637,6 +1031,16 @@ onMounted(() => {
               <option value="PUBLIC">PUBLIC</option>
               <option value="TEAM">TEAM</option>
               <option value="PRIVATE">PRIVATE</option>
+            </select>
+          </label>
+          <label>
+            权限级别
+            <select
+              data-testid="team-share-permission"
+              v-model="sharePermission"
+            >
+              <option value="READ">READ</option>
+              <option value="READ_METADATA">READ_METADATA</option>
             </select>
           </label>
           <label>
@@ -658,6 +1062,14 @@ onMounted(() => {
           </button>
         </div>
 
+        <p
+          v-if="!shareManualMode && shareWorkspaceOptions.length === 0"
+          class="team-muted"
+          data-testid="team-share-workspace-empty"
+        >
+          当前组织下暂无可分享工作区，请先创建组织工作区后再刷新候选。
+        </p>
+
         <ul class="team-list">
           <li
             v-for="shareLink in shareLinks"
@@ -665,6 +1077,7 @@ onMounted(() => {
             data-testid="team-share-item"
           >
             <span>{{ shareLink.visibility }}</span>
+            <span>{{ shareLink.permission }}</span>
             <code>{{ shareLink.token }}</code>
             <button
               data-testid="team-share-revoke"
@@ -680,14 +1093,49 @@ onMounted(() => {
 
       <section class="team-card">
         <h3>审计日志</h3>
-        <div class="team-inline-actions">
-          <input
-            data-testid="team-audit-action"
-            v-model="auditAction"
-            type="text"
-            placeholder="按 action 过滤，例如 SHARE_LINK_CREATED"
-            @keydown.enter.prevent="queryAuditLogs"
-          />
+        <div class="team-form-grid">
+          <label>
+            Action
+            <input
+              data-testid="team-audit-action"
+              v-model="auditAction"
+              type="text"
+              placeholder="例如 SHARE_LINK_CREATED"
+              @blur="auditAction = auditAction.trim()"
+              @keydown.enter.prevent="queryAuditLogs"
+            />
+          </label>
+          <label>
+            操作者 ID
+            <input
+              data-testid="team-audit-actor"
+              v-model="auditActorId"
+              type="text"
+              placeholder="可选，按 actorId 过滤"
+              @blur="auditActorId = auditActorId.trim()"
+              @keydown.enter.prevent="queryAuditLogs"
+            />
+          </label>
+          <label>
+            开始时间
+            <input
+              data-testid="team-audit-from"
+              v-model="auditFrom"
+              type="datetime-local"
+              @blur="onAuditFromBlur"
+              @keydown.enter.prevent="queryAuditLogs"
+            />
+          </label>
+          <label>
+            结束时间
+            <input
+              data-testid="team-audit-to"
+              v-model="auditTo"
+              type="datetime-local"
+              @blur="onAuditToBlur"
+              @keydown.enter.prevent="queryAuditLogs"
+            />
+          </label>
           <button
             data-testid="team-audit-query"
             type="button"
@@ -697,6 +1145,14 @@ onMounted(() => {
             查询
           </button>
         </div>
+
+        <p
+          v-if="auditLogs.length === 0"
+          class="team-muted"
+          data-testid="team-audit-empty"
+        >
+          暂无匹配审计记录。
+        </p>
 
         <ul class="team-list">
           <li
@@ -710,6 +1166,30 @@ onMounted(() => {
         </ul>
       </section>
     </template>
+
+    <ConfirmDialog
+      :open="Boolean(memberPendingRemove)"
+      title="确认移除成员"
+      :message="memberPendingRemove ? `确定移除 ${memberPendingRemove.user.email} 吗？此操作不可撤销。` : ''"
+      confirm-text="确认移除"
+      cancel-text="取消"
+      :loading="working"
+      danger
+      @cancel="cancelRemoveMember"
+      @confirm="confirmRemoveMember"
+    />
+
+    <ConfirmDialog
+      :open="Boolean(organizationPendingDelete)"
+      title="确认删除组织"
+      :message="organizationPendingDelete ? `确定删除组织 ${organizationPendingDelete.name} 吗？该组织的成员、分享链接和审计日志将被删除，关联工作区会解除组织绑定。` : ''"
+      confirm-text="确认删除"
+      cancel-text="取消"
+      :loading="working"
+      danger
+      @cancel="cancelDeleteOrganization"
+      @confirm="confirmDeleteOrganization"
+    />
   </section>
 </template>
 
@@ -845,6 +1325,18 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
+.team-member-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.team-member-actions label {
+  min-width: 128px;
+}
+
 .team-feedback {
   margin: 0;
   padding: 10px 12px;
@@ -872,6 +1364,12 @@ onMounted(() => {
 }
 
 .team-user-email {
+  font-size: 12px;
+  color: var(--theme-text-secondary);
+}
+
+.team-muted {
+  margin: 0;
   font-size: 12px;
   color: var(--theme-text-secondary);
 }

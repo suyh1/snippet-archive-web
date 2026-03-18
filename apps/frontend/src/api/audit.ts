@@ -18,6 +18,11 @@ export type AuditLogResult = {
   pageSize: number
 }
 
+function normalizeQueryValue(value?: string) {
+  const normalized = value?.trim()
+  return normalized && normalized.length > 0 ? normalized : undefined
+}
+
 export const auditApi = {
   listOrganizationAuditLogs(
     organizationId: string,
@@ -31,18 +36,22 @@ export const auditApi = {
     },
   ) {
     const params = new URLSearchParams()
+    const action = normalizeQueryValue(query?.action)
+    const actorId = normalizeQueryValue(query?.actorId)
+    const from = normalizeQueryValue(query?.from)
+    const to = normalizeQueryValue(query?.to)
 
-    if (query?.action) {
-      params.set('action', query.action)
+    if (action) {
+      params.set('action', action)
     }
-    if (query?.actorId) {
-      params.set('actorId', query.actorId)
+    if (actorId) {
+      params.set('actorId', actorId)
     }
-    if (query?.from) {
-      params.set('from', query.from)
+    if (from) {
+      params.set('from', from)
     }
-    if (query?.to) {
-      params.set('to', query.to)
+    if (to) {
+      params.set('to', to)
     }
     if (query?.page) {
       params.set('page', String(query.page))
