@@ -1,0 +1,62 @@
+{
+  "name": "@snippet-archive/vscode-extension",
+  "private": true,
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onCommand:snippetArchive.signIn",
+    "onCommand:snippetArchive.saveSnippet",
+    "onCommand:snippetArchive.searchAndInsert",
+    "onCommand:snippetArchive.openWebSearch"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "snippetArchive.signIn",
+        "title": "Snippet Archive: Sign In"
+      },
+      {
+        "command": "snippetArchive.saveSnippet",
+        "title": "Snippet Archive: Save Snippet"
+      },
+      {
+        "command": "snippetArchive.searchAndInsert",
+        "title": "Snippet Archive: Search and Insert Snippet"
+      },
+      {
+        "command": "snippetArchive.openWebSearch",
+        "title": "Snippet Archive: Open Web Search"
+      }
+    ],
+    "configuration": {
+      "title": "Snippet Archive",
+      "properties": {
+        "snippetArchive.apiBaseUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:3001/api",
+          "description": "Snippet Archive API base URL"
+        },
+        "snippetArchive.webBaseUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:5173",
+          "description": "Snippet Archive Web app base URL"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -w -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.18",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

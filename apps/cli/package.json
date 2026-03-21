@@ -1,0 +1,21 @@
+{
+  "name": "@snippet-archive/cli",
+  "private": true,
+  "version": "0.1.0",
+  "bin": {
+    "snippet-archive": "./dist/cli.js"
+  },
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "tsx": "^4.20.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.18",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

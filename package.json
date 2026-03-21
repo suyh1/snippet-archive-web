@@ -3,11 +3,15 @@
   "private": true,
   "workspaces": [
     "apps/frontend",
-    "apps/backend"
+    "apps/backend",
+    "apps/vscode-extension",
+    "apps/cli"
   ],
   "scripts": {
     "dev:frontend": "npm run dev --workspace @snippet-archive/frontend",
     "dev:backend": "npm run dev --workspace @snippet-archive/backend",
-    "build": "npm run build --workspace @snippet-archive/frontend && npm run build --workspace @snippet-archive/backend"
+    "build:vscode-extension": "npm run build --workspace @snippet-archive/vscode-extension",
+    "build:cli": "npm run build --workspace @snippet-archive/cli",
+    "build": "npm run build --workspace @snippet-archive/frontend && npm run build --workspace @snippet-archive/backend && npm run build --workspace @snippet-archive/vscode-extension && npm run build --workspace @snippet-archive/cli"
   }
 }

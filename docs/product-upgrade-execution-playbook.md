@@ -264,8 +264,8 @@
 11. 线程 F2-2：分享权限级别收口（✅ 已完成）。
 12. 线程 F2-3：成员管理闭环（✅ 已完成）。
 13. 线程 F2-4：M2 指标证据化（✅ 已完成）。
-14. 线程 I：VS Code 插件 PoC（未开始）。
-15. 线程 J：CLI + 导入导出协议（未开始）。
+14. 线程 I：VS Code 插件 PoC（✅ 已完成）。
+15. 线程 J：CLI + 导入导出协议（✅ 已完成）。
 
 ## 6. 里程碑与指标
 
@@ -1286,4 +1286,144 @@ F2-4 验收标准：
      - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
      - `npm run typecheck --workspace @snippet-archive/frontend`
    - 全量构建：
+     - `npm run build`
+
+## 22. 阶段三执行细化（线程 I：VS Code 插件 PoC）
+
+### 22.1 线程目标
+
+1. 交付 VS Code 插件 PoC，覆盖“保存片段 / 搜索插入 / 跳转 Web”闭环。
+2. 复用现有后端 API（`auth/workspaces/search`），打通 IDE 侧可用链路。
+3. 提供可回归的最小自动化测试与构建脚本，为线程 J（CLI + 协议）打基础。
+
+### 22.2 线程 I 小功能点清单（逐项打标）
+
+I0 文档与状态：
+- [x] I0-1：线程总览将线程 I 标记为“进行中”。
+- [x] I0-2：在线程完成后补执行记录与命令证据。
+
+I1 插件工程骨架：
+- [x] I1-1：新增 `apps/vscode-extension` 工程（`package.json`、`tsconfig`、构建脚本）。
+- [x] I1-2：声明命令与配置项（`apiBaseUrl/webBaseUrl`、命令面板入口）。
+- [x] I1-3：补基础说明文档（运行/调试/打包）。
+
+I2 认证与 API 客户端：
+- [x] I2-1：实现登录链路（`/api/auth/login`）并持久化 token。
+- [x] I2-2：实现工作区列表、文件创建/更新、搜索接口客户端封装。
+- [x] I2-3：统一错误提示（鉴权失败/网络失败/参数缺失）。
+
+I3 插件核心交互：
+- [x] I3-1：保存当前选区（为空则保存全文）到目标工作区。
+- [x] I3-2：搜索片段并插入到当前编辑光标位置。
+- [x] I3-3：支持从插件跳转 Web 搜索页（携带关键词）。
+
+I4 回归与门禁：
+- [x] I4-1：新增插件核心单测（先红后绿），覆盖 upsert 与查询参数拼装。
+- [x] I4-2：通过插件 targeted 验证（test/build）。
+- [x] I4-3：通过仓库 full gate（backend/frontend test、typecheck、build）。
+
+I5 完成标记：
+- [x] I5-1：线程总览将“线程 I”标记为已完成。
+- [x] I5-2：追加线程 I 执行记录（日期、结果、验证命令与结论）。
+
+### 22.3 当前状态
+
+1. 当前状态：✅ 已完成（线程 I 全部验收通过）。
+2. 当前阻塞：无。
+
+### 2026-03-21｜线程 I（VS Code 插件 PoC）
+
+1. 目标：启动阶段三并交付 IDE PoC，打通“保存片段 / 搜索插入 / 跳转 Web”闭环。
+2. 结果：
+   - 新增独立插件工程：`apps/vscode-extension`（`package.json`、`tsconfig`、`vitest` 配置、README）。
+   - 新增插件命令：`signIn`、`saveSnippet`、`searchAndInsert`、`openWebSearch`，并补齐 `apiBaseUrl/webBaseUrl` 可配置项。
+   - 新增 API 客户端与核心服务：复用现有 `/api/auth/login`、`/api/workspaces/*`、`/api/search/snippets`，支持基于 `path` 的片段 upsert。
+   - 回归测试：新增 `search-query.spec.ts` 与 `snippet-service.spec.ts`，按 RED->GREEN 完成闭环。
+3. 验证命令：
+   - 目标回归（先红后绿）：
+     - `npm run test`（cwd: `apps/vscode-extension`，RED：缺少 `search-query/snippet-service` 模块）
+     - `npm run test`（cwd: `apps/vscode-extension`，GREEN：2 files / 4 tests passed）
+   - 插件 targeted：
+     - `npm run test`（cwd: `apps/vscode-extension`）
+     - `npm run build`（cwd: `apps/vscode-extension`）
+   - 仓库 full gate（均通过）：
+     - `npm run test --workspace @snippet-archive/backend`
+     - `npm run test:e2e --workspace @snippet-archive/backend`
+     - `npm run test:run --workspace @snippet-archive/frontend`
+     - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
+     - `npm run typecheck --workspace @snippet-archive/frontend`
+     - `npm run build`
+
+## 23. 阶段三执行细化（线程 J：CLI + 导入导出协议）
+
+### 23.1 线程目标
+
+1. 交付可用于 CI 的 CLI v1：支持检索、导出、导入、批量同步命令。
+2. 固化导入导出协议为版本化 schema（`snippet-archive-bundle/v1`）。
+3. 与线程 I 联动：把 `vscode-extension + cli` 一并纳入根 workspace 与根 build 链路。
+
+### 23.2 线程 J 小功能点清单（逐项打标）
+
+J0 文档与状态：
+- [x] J0-1：线程总览将线程 J 标记为“进行中/已完成”可追踪。
+- [x] J0-2：追加线程 J 执行记录与命令证据。
+
+J1 CLI 工程骨架：
+- [x] J1-1：新增 `apps/cli` 工程（`package.json`、`tsconfig`、`vitest`）。
+- [x] J1-2：提供命令入口 `src/cli.ts` 与基础帮助信息。
+- [x] J1-3：补充 CLI README（命令、配置、开发流程）。
+
+J2 导入导出协议（版本化）：
+- [x] J2-1：定义 `snippet-archive-bundle/v1` 协议结构与运行时校验。
+- [x] J2-2：新增 schema 文件 `docs/schemas/snippet-bundle.v1.schema.json`。
+- [x] J2-3：导出链路按稳定顺序输出 workspace/file 内容。
+
+J3 CLI 核心能力：
+- [x] J3-1：`login`（调用 `/api/auth/login`，落本地 token）。
+- [x] J3-2：`search`（检索片段，支持 json/plain 输出）。
+- [x] J3-3：`export`（导出 bundle 到 stdout 或文件）。
+- [x] J3-4：`import/sync`（按 workspace title + file path 执行 upsert）。
+
+J4 回归与门禁：
+- [x] J4-1：新增 CLI 回归测试（先红后绿）：参数解析、bundle 校验、upsert 同步。
+- [x] J4-2：通过 CLI targeted（test/build）。
+- [x] J4-3：通过仓库 full gate（backend/frontend test、typecheck、build）。
+
+J5 完成标记：
+- [x] J5-1：线程总览将“线程 J”标记为已完成。
+- [x] J5-2：执行记录同步“先做 2（接入根链路）再做 1（线程 J）”顺序与证据。
+
+### 23.3 当前状态
+
+1. 当前状态：✅ 已完成（线程 J 全部验收通过）。
+2. 当前阻塞：无。
+
+### 2026-03-21｜线程 J（CLI + 导入导出协议）
+
+1. 目标：交付 CLI v1 与版本化导入导出协议，并将扩展端（VS Code/CLI）统一接入主构建链路。
+2. 结果：
+   - 根链路接入（先做 2）：
+     - 根 `package.json` 的 `workspaces` 新增 `apps/vscode-extension`、`apps/cli`。
+     - 根 `build` 脚本新增并串联 `@snippet-archive/vscode-extension` 与 `@snippet-archive/cli`。
+   - 线程 J 实现（后做 1）：
+     - 新增 `apps/cli`，支持 `login/search/export/import/sync`。
+     - 新增导入导出协议运行时校验与 schema 文档：`snippet-archive-bundle/v1`。
+     - 导入按 `workspace.title + file.path` 执行 upsert，同步输出统计摘要。
+   - 回归测试：
+     - `cli-args.spec.ts`、`bundle-schema.spec.ts`、`importer.spec.ts` 覆盖参数解析、协议校验、同步逻辑。
+3. 验证命令：
+   - 目标回归（先红后绿）：
+     - `npm run test`（cwd: `apps/cli`，RED：缺少 `core` 模块）
+     - `npm run test`（cwd: `apps/cli`，GREEN：3 files / 4 tests passed）
+   - 线程 targeted（均通过）：
+     - `npm run test --workspace @snippet-archive/cli`
+     - `npm run build --workspace @snippet-archive/cli`
+     - `npm run test --workspace @snippet-archive/vscode-extension`
+     - `npm run build --workspace @snippet-archive/vscode-extension`
+   - 仓库 full gate（均通过）：
+     - `npm run test --workspace @snippet-archive/backend`
+     - `npm run test:e2e --workspace @snippet-archive/backend`
+     - `npm run test:run --workspace @snippet-archive/frontend`
+     - `npm run test:e2e:smoke --workspace @snippet-archive/frontend`
+     - `npm run typecheck --workspace @snippet-archive/frontend`
      - `npm run build`
